@@ -19,8 +19,17 @@ def keychain(service: str, account: str = "finance-anomaly-tracker") -> str:
     ).strip()
 
 
+def optional_keychain(service: str) -> str | None:
+    try:
+        return keychain(service)
+    except Exception:
+        return None
+
+
 def required_env(name: str) -> str:
     value = os.environ.get(name)
+    if not value:
+        value = optional_keychain(name)
     if not value:
         raise SystemExit(f"Missing {name}")
     return value.rstrip("/") if name == "DOKPLOY_URL" else value
@@ -64,8 +73,10 @@ def env_text() -> str:
 def main() -> int:
     base_url = required_env("DOKPLOY_URL")
     token = os.environ.get("DOKPLOY_API_TOKEN") or keychain("DOKPLOY_API_TOKEN")
-    compose_id = os.environ.get("DOKPLOY_COMPOSE_ID")
+    compose_id = os.environ.get("DOKPLOY_COMPOSE_ID") or optional_keychain("DOKPLOY_COMPOSE_ID")
     environment_id = os.environ.get("DOKPLOY_ENVIRONMENT_ID")
+    if not environment_id and not compose_id:
+        environment_id = optional_keychain("DOKPLOY_ENVIRONMENT_ID")
     owner = os.environ.get("DOKPLOY_GITHUB_OWNER", "pand40x")
     repository = os.environ.get("DOKPLOY_GITHUB_REPOSITORY", "crypto-anomaly-tracker")
     branch = os.environ.get("DOKPLOY_GITHUB_BRANCH", "main")
