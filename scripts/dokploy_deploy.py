@@ -16,6 +16,7 @@ def keychain(service: str, account: str = "finance-anomaly-tracker") -> str:
     return subprocess.check_output(
         ["security", "find-generic-password", "-s", service, "-a", account, "-w"],
         text=True,
+        stderr=subprocess.DEVNULL,
     ).strip()
 
 
