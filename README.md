@@ -50,7 +50,7 @@ Telegram candidates must pass their own asset-specific signal threshold and the 
 
 The included `docker-compose.yml` uses `env_file: .env` because Dokploy writes compose variables into a `.env` file beside the compose file. The service listens on `PORT`, defaults to `8080`, and stores state in the named Docker volume.
 
-Deploy with an existing Compose service:
+The repository source is expected at `pand40x/crypto-anomaly-tracker` on branch `main`. Deploy with an existing Compose service:
 
 ```bash
 DOKPLOY_URL=https://your-dokploy.example \
@@ -65,3 +65,9 @@ DOKPLOY_URL=https://your-dokploy.example \
 DOKPLOY_ENVIRONMENT_ID=your-environment-id \
 rtk python3 scripts/dokploy_deploy.py
 ```
+
+Optional overrides:
+
+- `DOKPLOY_GITHUB_OWNER`
+- `DOKPLOY_GITHUB_REPOSITORY`
+- `DOKPLOY_GITHUB_BRANCH`

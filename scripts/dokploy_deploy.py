@@ -64,9 +64,23 @@ def env_text() -> str:
 def main() -> int:
     base_url = required_env("DOKPLOY_URL")
     token = os.environ.get("DOKPLOY_API_TOKEN") or keychain("DOKPLOY_API_TOKEN")
-    compose_file = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     compose_id = os.environ.get("DOKPLOY_COMPOSE_ID")
     environment_id = os.environ.get("DOKPLOY_ENVIRONMENT_ID")
+    owner = os.environ.get("DOKPLOY_GITHUB_OWNER", "pand40x")
+    repository = os.environ.get("DOKPLOY_GITHUB_REPOSITORY", "crypto-anomaly-tracker")
+    branch = os.environ.get("DOKPLOY_GITHUB_BRANCH", "main")
+
+    source_payload = {
+        "name": "finance-anomaly-tracker",
+        "appName": "finance-anomaly-tracker",
+        "sourceType": "github",
+        "composeType": "docker-compose",
+        "owner": owner,
+        "repository": repository,
+        "branch": branch,
+        "composePath": "docker-compose.yml",
+        "autoDeploy": True,
+    }
 
     if compose_id:
         print("Updating existing Dokploy compose")
@@ -75,15 +89,7 @@ def main() -> int:
             token,
             "POST",
             "compose.update",
-            {
-                "composeId": compose_id,
-                "name": "finance-anomaly-tracker",
-                "appName": "finance-anomaly-tracker",
-                "composeFile": compose_file,
-                "env": env_text(),
-                "sourceType": "raw",
-                "composeType": "docker-compose",
-            },
+            {"composeId": compose_id, **source_payload},
         )
     else:
         if not environment_id:
@@ -99,7 +105,6 @@ def main() -> int:
                 "description": "Crypto anomaly tracker with Telegram alerts",
                 "environmentId": environment_id,
                 "appName": "finance-anomaly-tracker",
-                "composeFile": compose_file,
                 "composeType": "docker-compose",
             },
         )
@@ -107,7 +112,10 @@ def main() -> int:
         if not compose_id:
             print(json.dumps(created, indent=2))
             raise SystemExit("Dokploy did not return compose id")
-        api(base_url, token, "POST", "compose.update", {"composeId": compose_id, "env": env_text()})
+        api(base_url, token, "POST", "compose.update", {"composeId": compose_id, **source_payload})
+
+    print("Saving environment")
+    api(base_url, token, "POST", "compose.saveEnvironment", {"composeId": compose_id, "env": env_text()})
 
     print("Deploying Dokploy compose")
     api(base_url, token, "POST", "compose.deploy", {"composeId": compose_id})
