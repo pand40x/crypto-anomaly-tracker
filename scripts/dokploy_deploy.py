@@ -10,6 +10,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OWNER = "pand40x"
+DEFAULT_REPOSITORY = "crypto-anomaly-tracker"
+DEFAULT_BRANCH = "main"
 
 
 def keychain(service: str, account: str = "finance-anomaly-tracker") -> str:
@@ -71,6 +74,12 @@ def env_text() -> str:
     )
 
 
+def compose_text(owner: str, repository: str, branch: str) -> str:
+    text = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    git_context = f"https://github.com/{owner}/{repository}.git#{branch}"
+    return text.replace("context: .", f"context: {git_context}")
+
+
 def main() -> int:
     base_url = required_env("DOKPLOY_URL")
     token = os.environ.get("DOKPLOY_API_TOKEN") or keychain("DOKPLOY_API_TOKEN")
@@ -78,19 +87,16 @@ def main() -> int:
     environment_id = os.environ.get("DOKPLOY_ENVIRONMENT_ID")
     if not environment_id and not compose_id:
         environment_id = optional_keychain("DOKPLOY_ENVIRONMENT_ID")
-    owner = os.environ.get("DOKPLOY_GITHUB_OWNER", "pand40x")
-    repository = os.environ.get("DOKPLOY_GITHUB_REPOSITORY", "crypto-anomaly-tracker")
-    branch = os.environ.get("DOKPLOY_GITHUB_BRANCH", "main")
+    owner = os.environ.get("DOKPLOY_GITHUB_OWNER", DEFAULT_OWNER)
+    repository = os.environ.get("DOKPLOY_GITHUB_REPOSITORY", DEFAULT_REPOSITORY)
+    branch = os.environ.get("DOKPLOY_GITHUB_BRANCH", DEFAULT_BRANCH)
 
     source_payload = {
         "name": "finance-anomaly-tracker",
         "appName": "finance-anomaly-tracker",
-        "sourceType": "github",
+        "sourceType": "raw",
         "composeType": "docker-compose",
-        "owner": owner,
-        "repository": repository,
-        "branch": branch,
-        "composePath": "docker-compose.yml",
+        "composeFile": compose_text(owner, repository, branch),
         "autoDeploy": True,
     }
 
