@@ -63,6 +63,7 @@ def env_text() -> str:
             f"ANOMALY_GLOBAL_LIMIT={os.environ.get('ANOMALY_GLOBAL_LIMIT', '10')}",
             f"ANOMALY_INTERVAL={os.environ.get('ANOMALY_INTERVAL', '4h')}",
             f"ANOMALY_LOOKBACK_DAYS={os.environ.get('ANOMALY_LOOKBACK_DAYS', '730')}",
+            f"ANOMALY_MIN_HISTORY_DAYS={os.environ.get('ANOMALY_MIN_HISTORY_DAYS', '180')}",
             f"ANOMALY_ROLLING_BARS={os.environ.get('ANOMALY_ROLLING_BARS', '42')}",
             f"ANOMALY_MIN_ABS_PCT_CHANGE={os.environ.get('ANOMALY_MIN_ABS_PCT_CHANGE', '1.0')}",
             f"ANOMALY_MIN_VOLUME_RATIO={os.environ.get('ANOMALY_MIN_VOLUME_RATIO', '1.5')}",

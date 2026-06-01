@@ -18,6 +18,7 @@ def health_payload(config: AppConfig) -> dict:
         "global_limit": config.global_limit,
         "interval": config.interval,
         "lookback_days": config.lookback_days,
+        "min_history_days": config.min_history_days,
         "scan_interval_seconds": config.scan_interval_seconds,
         "scan_workers": config.scan_workers,
         "run_on_start": config.run_on_start,

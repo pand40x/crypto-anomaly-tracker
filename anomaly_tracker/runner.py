@@ -41,7 +41,9 @@ def persist_scan_result(
 def _calibrate_symbol(symbol: str, config: AppConfig, start_ms: int, end_ms: int) -> AssetCalibration | None:
     client = BinanceClient()
     candles = client.klines(symbol, config.interval, start_ms, end_ms)
-    if len(candles) < max(config.rolling_bars + 10, 60):
+    candles_per_day = 6 if config.interval == "4h" else 24 if config.interval == "1h" else 1
+    min_candles = max(config.rolling_bars + 10, config.min_history_days * candles_per_day)
+    if len(candles) < min_candles:
         return None
     return calibrate_asset(symbol, candles, rolling_bars=config.rolling_bars)
 

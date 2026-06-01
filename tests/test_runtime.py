@@ -30,6 +30,7 @@ class RuntimeTests(unittest.TestCase):
             "PORT": "8090",
             "ANOMALY_SYMBOL_LIMIT": "25",
             "ANOMALY_LOOKBACK_DAYS": "365",
+            "ANOMALY_MIN_HISTORY_DAYS": "180",
             "ANOMALY_SCAN_INTERVAL_SECONDS": "60",
             "ANOMALY_SCAN_WORKERS": "6",
             "ANOMALY_RUN_ON_START": "false",
@@ -41,6 +42,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(config.port, 8090)
         self.assertEqual(config.symbol_limit, 25)
         self.assertEqual(config.lookback_days, 365)
+        self.assertEqual(config.min_history_days, 180)
         self.assertEqual(config.scan_interval_seconds, 60)
         self.assertEqual(config.scan_workers, 6)
         self.assertFalse(config.run_on_start)

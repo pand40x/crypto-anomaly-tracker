@@ -7,6 +7,9 @@ STABLE_BASES = {
     "TUSD",
     "USDP",
     "DAI",
+    "USD1",
+    "RLUSD",
+    "XUSD",
     "EUR",
     "EURI",
     "AEUR",
@@ -14,6 +17,7 @@ STABLE_BASES = {
     "BRL",
     "BIDR",
 }
+NON_CRYPTO_BASES = {"PAXG", "XAUT", "WBETH"}
 LEVERAGED_SUFFIXES = ("UP", "DOWN", "BULL", "BEAR")
 
 
@@ -32,7 +36,11 @@ def _is_allowed_symbol(info: dict) -> bool:
         return False
     if not symbol.endswith("USDT"):
         return False
+    if not base.isascii() or not base.isalnum():
+        return False
     if base in STABLE_BASES:
+        return False
+    if base in NON_CRYPTO_BASES:
         return False
     return not any(base.endswith(suffix) for suffix in LEVERAGED_SUFFIXES)
 

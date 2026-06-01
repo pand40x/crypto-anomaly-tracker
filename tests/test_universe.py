@@ -11,6 +11,11 @@ class UniverseTests(unittest.TestCase):
                 {"symbol": "ETHUSDT", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
                 {"symbol": "OLDUSDT", "status": "BREAK", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
                 {"symbol": "EURUSDT", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
+                {"symbol": "USD1USDT", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
+                {"symbol": "RLUSDUSDT", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
+                {"symbol": "XAUTUSDT", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
+                {"symbol": "WBETHUSDT", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
+                {"symbol": "币安人生USDT", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
                 {"symbol": "BTCDOWNUSDT", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "USDT"},
                 {"symbol": "BNBBTC", "status": "TRADING", "isSpotTradingAllowed": True, "quoteAsset": "BTC"},
             ]
@@ -20,6 +25,11 @@ class UniverseTests(unittest.TestCase):
             {"symbol": "BTCUSDT", "quoteVolume": "300"},
             {"symbol": "OLDUSDT", "quoteVolume": "10000"},
             {"symbol": "EURUSDT", "quoteVolume": "9000"},
+            {"symbol": "USD1USDT", "quoteVolume": "9000"},
+            {"symbol": "RLUSDUSDT", "quoteVolume": "9000"},
+            {"symbol": "XAUTUSDT", "quoteVolume": "9000"},
+            {"symbol": "WBETHUSDT", "quoteVolume": "9000"},
+            {"symbol": "币安人生USDT", "quoteVolume": "9000"},
             {"symbol": "BTCDOWNUSDT", "quoteVolume": "8000"},
             {"symbol": "BNBBTC", "quoteVolume": "7000"},
         ]

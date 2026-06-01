@@ -34,6 +34,7 @@ class AppConfig:
     global_limit: int
     interval: str
     lookback_days: int
+    min_history_days: int
     rolling_bars: int
     min_abs_pct_change: float
     min_volume_ratio: float
@@ -58,6 +59,7 @@ class AppConfig:
             global_limit=_int_env(source, "ANOMALY_GLOBAL_LIMIT", 10),
             interval=source.get("ANOMALY_INTERVAL", "4h"),
             lookback_days=_int_env(source, "ANOMALY_LOOKBACK_DAYS", 730),
+            min_history_days=_int_env(source, "ANOMALY_MIN_HISTORY_DAYS", 180),
             rolling_bars=_int_env(source, "ANOMALY_ROLLING_BARS", 42),
             min_abs_pct_change=_float_env(source, "ANOMALY_MIN_ABS_PCT_CHANGE", 1.0),
             min_volume_ratio=_float_env(source, "ANOMALY_MIN_VOLUME_RATIO", 1.5),
