@@ -19,6 +19,7 @@ def health_payload(config: AppConfig) -> dict:
         "interval": config.interval,
         "lookback_days": config.lookback_days,
         "scan_interval_seconds": config.scan_interval_seconds,
+        "scan_workers": config.scan_workers,
         "run_on_start": config.run_on_start,
         "telegram_configured": bool(config.telegram_bot_token and config.telegram_chat_id),
     }

@@ -31,6 +31,7 @@ class RuntimeTests(unittest.TestCase):
             "ANOMALY_SYMBOL_LIMIT": "25",
             "ANOMALY_LOOKBACK_DAYS": "365",
             "ANOMALY_SCAN_INTERVAL_SECONDS": "60",
+            "ANOMALY_SCAN_WORKERS": "6",
             "ANOMALY_RUN_ON_START": "false",
             "TELEGRAM_USER_ID": "12345",
         }
@@ -41,6 +42,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(config.symbol_limit, 25)
         self.assertEqual(config.lookback_days, 365)
         self.assertEqual(config.scan_interval_seconds, 60)
+        self.assertEqual(config.scan_workers, 6)
         self.assertFalse(config.run_on_start)
         self.assertEqual(config.telegram_chat_id, "12345")
 

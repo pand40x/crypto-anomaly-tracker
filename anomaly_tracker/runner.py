@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from anomaly_tracker.binance import BinanceClient
@@ -37,6 +38,14 @@ def persist_scan_result(
     return payload
 
 
+def _calibrate_symbol(symbol: str, config: AppConfig, start_ms: int, end_ms: int) -> AssetCalibration | None:
+    client = BinanceClient()
+    candles = client.klines(symbol, config.interval, start_ms, end_ms)
+    if len(candles) < max(config.rolling_bars + 10, 60):
+        return None
+    return calibrate_asset(symbol, candles, rolling_bars=config.rolling_bars)
+
+
 def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] | None = None) -> dict:
     client = BinanceClient()
     end_ms = client.server_time_ms()
@@ -48,11 +57,19 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
     )
 
     calibrations = []
-    for symbol in selected_symbols:
-        candles = client.klines(symbol, config.interval, start_ms, end_ms)
-        if len(candles) < max(config.rolling_bars + 10, 60):
-            continue
-        calibrations.append(calibrate_asset(symbol, candles, rolling_bars=config.rolling_bars))
+    with ThreadPoolExecutor(max_workers=max(1, config.scan_workers)) as executor:
+        futures = {
+            executor.submit(_calibrate_symbol, symbol, config, start_ms, end_ms): symbol
+            for symbol in selected_symbols
+        }
+        for future in as_completed(futures):
+            symbol = futures[future]
+            try:
+                calibration = future.result()
+                if calibration:
+                    calibrations.append(calibration)
+            except Exception as exc:
+                print(f"scan warning: {symbol} skipped: {exc}", flush=True)
 
     candidates = select_signal_candidates(
         calibrations,

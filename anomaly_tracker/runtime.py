@@ -38,6 +38,7 @@ class AppConfig:
     min_abs_pct_change: float
     min_volume_ratio: float
     scan_interval_seconds: int
+    scan_workers: int
     cooldown_seconds: int
     run_on_start: bool
     output_dir: Path
@@ -61,6 +62,7 @@ class AppConfig:
             min_abs_pct_change=_float_env(source, "ANOMALY_MIN_ABS_PCT_CHANGE", 1.0),
             min_volume_ratio=_float_env(source, "ANOMALY_MIN_VOLUME_RATIO", 1.5),
             scan_interval_seconds=_int_env(source, "ANOMALY_SCAN_INTERVAL_SECONDS", 4 * 60 * 60),
+            scan_workers=_int_env(source, "ANOMALY_SCAN_WORKERS", 8),
             cooldown_seconds=_int_env(source, "ANOMALY_COOLDOWN_SECONDS", 12 * 60 * 60),
             run_on_start=_bool_env(source, "ANOMALY_RUN_ON_START", True),
             output_dir=output_dir,

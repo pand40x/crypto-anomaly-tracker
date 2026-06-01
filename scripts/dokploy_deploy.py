@@ -67,6 +67,7 @@ def env_text() -> str:
             f"ANOMALY_MIN_ABS_PCT_CHANGE={os.environ.get('ANOMALY_MIN_ABS_PCT_CHANGE', '1.0')}",
             f"ANOMALY_MIN_VOLUME_RATIO={os.environ.get('ANOMALY_MIN_VOLUME_RATIO', '1.5')}",
             f"ANOMALY_SCAN_INTERVAL_SECONDS={os.environ.get('ANOMALY_SCAN_INTERVAL_SECONDS', '14400')}",
+            f"ANOMALY_SCAN_WORKERS={os.environ.get('ANOMALY_SCAN_WORKERS', '8')}",
             f"ANOMALY_COOLDOWN_SECONDS={os.environ.get('ANOMALY_COOLDOWN_SECONDS', '43200')}",
             f"ANOMALY_RUN_ON_START={os.environ.get('ANOMALY_RUN_ON_START', 'true')}",
             f"TELEGRAM_BOT_TOKEN={telegram_token}",
