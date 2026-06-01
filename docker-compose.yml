@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: crypto-anomaly-tracker
     restart: unless-stopped
     env_file:
       - path: .env
@@ -13,7 +12,7 @@ services:
       ANOMALY_OUTPUT_DIR: /app/outputs/live
       ANOMALY_STATE_PATH: /app/outputs/live/state.json
     ports:
-      - "${PORT:-8080}:8080"
+      - "${PUBLISHED_PORT:-18080}:8080"
     volumes:
       - anomaly-tracker-data:/app/outputs/live
     healthcheck:
