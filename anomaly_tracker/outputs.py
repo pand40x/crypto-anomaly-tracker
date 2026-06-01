@@ -9,6 +9,26 @@ def format_usd(value: float) -> str:
     return f"${value:,.0f}" if value >= 1000 else f"${value:,.2f}"
 
 
+def format_price(value: float) -> str:
+    if value >= 1000:
+        return f"${value:,.0f}"
+    if value >= 1:
+        return f"${value:,.3f}"
+    if value >= 0.01:
+        return f"${value:,.4f}"
+    return f"${value:,.6f}"
+
+
+def format_compact_usd(value: float) -> str:
+    if value >= 1_000_000_000:
+        return f"${value / 1_000_000_000:.1f}B"
+    if value >= 1_000_000:
+        return f"${value / 1_000_000:.1f}M"
+    if value >= 1_000:
+        return f"${value / 1_000:.1f}K"
+    return f"${value:,.0f}"
+
+
 def format_time(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -18,14 +38,13 @@ def display_symbol(symbol: str) -> str:
 
 
 def candidate_to_message(candidate: SignalCandidate) -> str:
-    direction = "yukselis" if candidate.direction == "up" else "dusus"
-    interval_text = {"1h": "1 saatte", "4h": "4 saatte", "1d": "1 gunde"}.get(candidate.source_interval, candidate.source_interval)
-    lane_text = " fast-lane" if candidate.lane == "fast" else ""
+    interval_text = {"1h": "1s", "4h": "4s", "1d": "1g"}.get(candidate.source_interval, candidate.source_interval)
+    lane_text = " | FAST" if candidate.lane == "fast" else ""
+    volume_text = f" | Hacim: {format_compact_usd(candidate.quote_volume)}" if candidate.quote_volume > 0 else ""
     return (
-        f"{display_symbol(candidate.symbol)} icin olagandisi{lane_text} {direction}: "
-        f"fiyat son {interval_text} {candidate.pct_change:+.2f}% hareketle "
-        f"{format_usd(candidate.close)} seviyesine geldi. {candidate.reason} "
-        f"Bu bir haber iddiasi degil; piyasanin normal ritminin disina ciktigini soyleyen erken uyari."
+        f"{display_symbol(candidate.symbol)} | {format_price(candidate.close)} | "
+        f"{interval_text} {candidate.pct_change:+.2f}% | Sebep: {candidate.reason}"
+        f"{volume_text}{lane_text}"
     )
 
 
@@ -44,6 +63,7 @@ def candidates_to_jsonable(candidates: list[SignalCandidate]) -> list[dict]:
             "reason": item.reason,
             "source_interval": item.source_interval,
             "lane": item.lane,
+            "quote_volume": item.quote_volume,
             "message": candidate_to_message(item),
         }
         for item in candidates

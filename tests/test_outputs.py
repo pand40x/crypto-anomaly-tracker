@@ -15,18 +15,21 @@ class OutputTests(unittest.TestCase):
             level="signal",
             direction="up",
             global_rank=1,
-            reason="Hacim normale gore 2.1x canlandi. Fiyat son haftalik bandin disina tasti.",
+            reason="hacimli alim, band kirilimi",
             source_interval="1h",
             lane="fast",
+            quote_volume=12_400_000,
         )
 
         message = candidate_to_message(candidate)
 
-        self.assertIn("BTC", message)
-        self.assertIn("son 1 saatte +2.40%", message)
+        self.assertEqual(
+            message,
+            "BTC | $109,250 | 1s +2.40% | Sebep: hacimli alim, band kirilimi | Hacim: $12.4M | FAST",
+        )
         self.assertIn("$109,250", message)
-        self.assertIn("erken uyari", message)
-        self.assertIn("fast-lane", message)
+        self.assertNotIn("x canlandi", message)
+        self.assertNotIn("haber iddiasi", message)
 
     def test_candidates_to_jsonable_preserves_rank_and_reason(self):
         candidate = SignalCandidate(
@@ -39,6 +42,7 @@ class OutputTests(unittest.TestCase):
             direction="down",
             global_rank=2,
             reason="Fiyat dustu.",
+            quote_volume=850_000,
         )
 
         payload = candidates_to_jsonable([candidate])
@@ -46,6 +50,7 @@ class OutputTests(unittest.TestCase):
         self.assertEqual(payload[0]["symbol"], "ETHUSDT")
         self.assertEqual(payload[0]["global_rank"], 2)
         self.assertEqual(payload[0]["reason"], "Fiyat dustu.")
+        self.assertEqual(payload[0]["quote_volume"], 850_000)
 
 
 if __name__ == "__main__":

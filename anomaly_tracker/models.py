@@ -37,6 +37,7 @@ class ScoredRow:
     range_ratio: float
     breakout: bool
     reason: str
+    quote_volume: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -59,3 +60,4 @@ class SignalCandidate:
     reason: str
     source_interval: str = "4h"
     lane: str = "main"
+    quote_volume: float = 0.0

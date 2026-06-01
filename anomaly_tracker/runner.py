@@ -86,6 +86,7 @@ def fast_lane_candidates(calibrations: list[AssetCalibration], global_limit: int
             reason=candidate.reason,
             source_interval="1h",
             lane="fast",
+            quote_volume=candidate.quote_volume,
         )
         for index, candidate in enumerate(fast[:global_limit], start=1)
     ]
@@ -161,6 +162,7 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
                 reason=item.reason,
                 source_interval=item.source_interval,
                 lane=item.lane,
+                quote_volume=item.quote_volume,
             )
             for index, item in enumerate(candidates, start=1)
         ]

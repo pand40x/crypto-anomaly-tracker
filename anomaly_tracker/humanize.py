@@ -2,14 +2,12 @@ from __future__ import annotations
 
 
 def explain_move(direction: str, volume_ratio: float, range_ratio: float, breakout: bool) -> str:
-    move_word = "yukseldi" if direction == "up" else "dustu"
-    parts = [f"Fiyat kendi normaline gore belirgin sekilde {move_word}."]
-    if volume_ratio >= 1.8:
-        parts.append(f"Hacim normale gore {volume_ratio:.1f}x canlandi.")
-    elif volume_ratio >= 1.25:
-        parts.append("Hacim normalin uzerinde.")
+    side = "alim" if direction == "up" else "satis"
+    parts = [f"hacimli {side}"]
     if range_ratio >= 1.8:
-        parts.append("Mum araligi genisledi; piyasa hizli karar degistiriyor.")
+        parts.append("genis mum")
     if breakout:
-        parts.append("Fiyat son haftalik bandin disina tasti.")
-    return " ".join(parts)
+        parts.append("band kirilimi")
+    if volume_ratio < 1.8 and range_ratio < 1.8 and not breakout:
+        parts.append("normal disi fiyat hareketi")
+    return ", ".join(parts)

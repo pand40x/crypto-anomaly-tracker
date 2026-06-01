@@ -114,6 +114,7 @@ def calibrate_asset(
                     "volume_ratio": volume_ratio,
                     "range_ratio": range_ratio,
                     "breakout": breakout,
+                    "quote_volume": candle.quote_volume,
                 }
             )
 
@@ -141,6 +142,7 @@ def calibrate_asset(
             range_ratio=row["range_ratio"],
             breakout=row["breakout"],
             reason=explain_move(row["direction"], row["volume_ratio"], row["range_ratio"], row["breakout"]),
+            quote_volume=row["quote_volume"],
         )
         for row in provisional
     ]
@@ -175,6 +177,7 @@ def select_signal_candidates(
             direction=row.direction,
             global_rank=index,
             reason=row.reason,
+            quote_volume=row.quote_volume,
         )
         for index, row in enumerate(ranked, start=1)
     ]
