@@ -16,14 +16,17 @@ class OutputTests(unittest.TestCase):
             direction="up",
             global_rank=1,
             reason="Hacim normale gore 2.1x canlandi. Fiyat son haftalik bandin disina tasti.",
+            source_interval="1h",
+            lane="fast",
         )
 
         message = candidate_to_message(candidate)
 
         self.assertIn("BTC", message)
-        self.assertIn("+2.40%", message)
+        self.assertIn("son 1 saatte +2.40%", message)
         self.assertIn("$109,250", message)
         self.assertIn("erken uyari", message)
+        self.assertIn("fast-lane", message)
 
     def test_candidates_to_jsonable_preserves_rank_and_reason(self):
         candidate = SignalCandidate(

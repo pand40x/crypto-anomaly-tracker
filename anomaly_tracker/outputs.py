@@ -19,9 +19,11 @@ def display_symbol(symbol: str) -> str:
 
 def candidate_to_message(candidate: SignalCandidate) -> str:
     direction = "yukselis" if candidate.direction == "up" else "dusus"
+    interval_text = {"1h": "1 saatte", "4h": "4 saatte", "1d": "1 gunde"}.get(candidate.source_interval, candidate.source_interval)
+    lane_text = " fast-lane" if candidate.lane == "fast" else ""
     return (
-        f"{display_symbol(candidate.symbol)} icin olagandisi {direction}: "
-        f"fiyat son 4 saatte {candidate.pct_change:+.2f}% hareketle "
+        f"{display_symbol(candidate.symbol)} icin olagandisi{lane_text} {direction}: "
+        f"fiyat son {interval_text} {candidate.pct_change:+.2f}% hareketle "
         f"{format_usd(candidate.close)} seviyesine geldi. {candidate.reason} "
         f"Bu bir haber iddiasi degil; piyasanin normal ritminin disina ciktigini soyleyen erken uyari."
     )
@@ -40,6 +42,8 @@ def candidates_to_jsonable(candidates: list[SignalCandidate]) -> list[dict]:
             "direction": item.direction,
             "global_rank": item.global_rank,
             "reason": item.reason,
+            "source_interval": item.source_interval,
+            "lane": item.lane,
             "message": candidate_to_message(item),
         }
         for item in candidates

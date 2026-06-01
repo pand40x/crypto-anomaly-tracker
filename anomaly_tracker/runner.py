@@ -48,6 +48,49 @@ def _calibrate_symbol(symbol: str, config: AppConfig, start_ms: int, end_ms: int
     return calibrate_asset(symbol, candles, rolling_bars=config.rolling_bars)
 
 
+def _calibrate_symbol_with_params(
+    symbol: str,
+    interval: str,
+    rolling_bars: int,
+    min_history_days: int,
+    start_ms: int,
+    end_ms: int,
+) -> AssetCalibration | None:
+    client = BinanceClient()
+    candles = client.klines(symbol, interval, start_ms, end_ms)
+    candles_per_day = 6 if interval == "4h" else 24 if interval == "1h" else 1
+    min_candles = max(rolling_bars + 10, min_history_days * candles_per_day)
+    if len(candles) < min_candles:
+        return None
+    return calibrate_asset(symbol, candles, rolling_bars=rolling_bars)
+
+
+def fast_lane_candidates(calibrations: list[AssetCalibration], global_limit: int = 10) -> list[SignalCandidate]:
+    candidates = select_signal_candidates(
+        calibrations,
+        global_limit=global_limit,
+        min_abs_pct_change=1.0,
+        min_volume_ratio=3.0,
+    )
+    fast = [candidate for candidate in candidates if candidate.level == "critical"]
+    return [
+        SignalCandidate(
+            symbol=candidate.symbol,
+            open_time=candidate.open_time,
+            close=candidate.close,
+            pct_change=candidate.pct_change,
+            score=candidate.score,
+            level=candidate.level,
+            direction=candidate.direction,
+            global_rank=index,
+            reason=candidate.reason,
+            source_interval="1h",
+            lane="fast",
+        )
+        for index, candidate in enumerate(fast[:global_limit], start=1)
+    ]
+
+
 def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] | None = None) -> dict:
     client = BinanceClient()
     end_ms = client.server_time_ms()
@@ -79,6 +122,48 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
         min_abs_pct_change=config.min_abs_pct_change,
         min_volume_ratio=config.min_volume_ratio,
     )
+    if config.fast_lane_enabled:
+        fast_start_ms = end_ms - config.fast_lookback_days * 24 * 60 * 60 * 1000
+        fast_calibrations = []
+        with ThreadPoolExecutor(max_workers=max(1, config.scan_workers)) as executor:
+            futures = {
+                executor.submit(
+                    _calibrate_symbol_with_params,
+                    symbol,
+                    config.fast_interval,
+                    config.fast_rolling_bars,
+                    config.min_history_days,
+                    fast_start_ms,
+                    end_ms,
+                ): symbol
+                for symbol in selected_symbols
+            }
+            for future in as_completed(futures):
+                symbol = futures[future]
+                try:
+                    calibration = future.result()
+                    if calibration:
+                        fast_calibrations.append(calibration)
+                except Exception as exc:
+                    print(f"fast-lane warning: {symbol} skipped: {exc}", flush=True)
+        candidates.extend(fast_lane_candidates(fast_calibrations, global_limit=config.global_limit))
+        candidates = sorted(candidates, key=lambda item: item.score, reverse=True)[: config.global_limit]
+        candidates = [
+            SignalCandidate(
+                symbol=item.symbol,
+                open_time=item.open_time,
+                close=item.close,
+                pct_change=item.pct_change,
+                score=item.score,
+                level=item.level,
+                direction=item.direction,
+                global_rank=index,
+                reason=item.reason,
+                source_interval=item.source_interval,
+                lane=item.lane,
+            )
+            for index, item in enumerate(candidates, start=1)
+        ]
     cooldown = CooldownState(config.state_path, cooldown_seconds=config.cooldown_seconds)
     sendable = [candidate for candidate in candidates if cooldown.should_send(candidate)]
 

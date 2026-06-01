@@ -21,6 +21,8 @@ def health_payload(config: AppConfig) -> dict:
         "min_history_days": config.min_history_days,
         "scan_interval_seconds": config.scan_interval_seconds,
         "scan_workers": config.scan_workers,
+        "fast_lane_enabled": config.fast_lane_enabled,
+        "fast_interval": config.fast_interval,
         "run_on_start": config.run_on_start,
         "telegram_configured": bool(config.telegram_bot_token and config.telegram_chat_id),
     }

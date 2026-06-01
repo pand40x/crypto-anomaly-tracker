@@ -33,6 +33,9 @@ class RuntimeTests(unittest.TestCase):
             "ANOMALY_MIN_HISTORY_DAYS": "180",
             "ANOMALY_SCAN_INTERVAL_SECONDS": "60",
             "ANOMALY_SCAN_WORKERS": "6",
+            "ANOMALY_FAST_LANE_ENABLED": "true",
+            "ANOMALY_FAST_INTERVAL": "1h",
+            "ANOMALY_FAST_MIN_VOLUME_RATIO": "3.0",
             "ANOMALY_RUN_ON_START": "false",
             "TELEGRAM_USER_ID": "12345",
         }
@@ -45,6 +48,9 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(config.min_history_days, 180)
         self.assertEqual(config.scan_interval_seconds, 60)
         self.assertEqual(config.scan_workers, 6)
+        self.assertTrue(config.fast_lane_enabled)
+        self.assertEqual(config.fast_interval, "1h")
+        self.assertEqual(config.fast_min_volume_ratio, 3.0)
         self.assertFalse(config.run_on_start)
         self.assertEqual(config.telegram_chat_id, "12345")
 

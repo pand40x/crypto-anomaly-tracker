@@ -40,6 +40,12 @@ class AppConfig:
     min_volume_ratio: float
     scan_interval_seconds: int
     scan_workers: int
+    fast_lane_enabled: bool
+    fast_interval: str
+    fast_lookback_days: int
+    fast_rolling_bars: int
+    fast_min_abs_pct_change: float
+    fast_min_volume_ratio: float
     cooldown_seconds: int
     run_on_start: bool
     output_dir: Path
@@ -65,6 +71,12 @@ class AppConfig:
             min_volume_ratio=_float_env(source, "ANOMALY_MIN_VOLUME_RATIO", 1.5),
             scan_interval_seconds=_int_env(source, "ANOMALY_SCAN_INTERVAL_SECONDS", 4 * 60 * 60),
             scan_workers=_int_env(source, "ANOMALY_SCAN_WORKERS", 8),
+            fast_lane_enabled=_bool_env(source, "ANOMALY_FAST_LANE_ENABLED", True),
+            fast_interval=source.get("ANOMALY_FAST_INTERVAL", "1h"),
+            fast_lookback_days=_int_env(source, "ANOMALY_FAST_LOOKBACK_DAYS", 365),
+            fast_rolling_bars=_int_env(source, "ANOMALY_FAST_ROLLING_BARS", 168),
+            fast_min_abs_pct_change=_float_env(source, "ANOMALY_FAST_MIN_ABS_PCT_CHANGE", 1.0),
+            fast_min_volume_ratio=_float_env(source, "ANOMALY_FAST_MIN_VOLUME_RATIO", 3.0),
             cooldown_seconds=_int_env(source, "ANOMALY_COOLDOWN_SECONDS", 12 * 60 * 60),
             run_on_start=_bool_env(source, "ANOMALY_RUN_ON_START", True),
             output_dir=output_dir,

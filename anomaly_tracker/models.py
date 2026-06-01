@@ -57,3 +57,5 @@ class SignalCandidate:
     direction: str
     global_rank: int
     reason: str
+    source_interval: str = "4h"
+    lane: str = "main"
