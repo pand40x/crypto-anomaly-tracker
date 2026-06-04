@@ -5,13 +5,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from anomaly_tracker.binance import BinanceClient
+from anomaly_tracker.candidates import apply_confirmation_bonus, dedupe_candidates_by_symbol
+from anomaly_tracker.market import combined_market_context, market_context_from_calibrations
 from anomaly_tracker.models import AssetCalibration, MarketContext, SignalCandidate
 from anomaly_tracker.outputs import candidate_to_message, candidates_to_jsonable, markdown_report
 from anomaly_tracker.runtime import AppConfig
 from anomaly_tracker.scoring import calibrate_asset, market_filter_decision, select_signal_candidates
+from anomaly_tracker.sectors import detect_sector_heat, sector_heat_to_jsonable
 from anomaly_tracker.state import CooldownState
 from anomaly_tracker.telegram import send_message
 from anomaly_tracker.universe import select_top_usdt_symbols
+from anomaly_tracker.watchlist import WatchlistStore, watchlist_send_override
 
 
 def persist_scan_result(
@@ -28,6 +32,8 @@ def persist_scan_result(
     interval: str,
     lookback_days: int,
     raw_candidate_count: int | None = None,
+    sector_heat: list[dict] | None = None,
+    watchlist_symbols: list[str] | None = None,
 ) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -41,6 +47,8 @@ def persist_scan_result(
         "filtered_count": len(filtered),
         "market_context": _market_context_to_jsonable(market_context),
         "market_filter_decisions": market_filter_decisions,
+        "sector_heat": sector_heat or [],
+        "watchlist_symbols": watchlist_symbols or [],
         "send_decisions": send_decisions,
         "candidates": _candidates_to_jsonable_with_decisions(candidates, send_decisions, market_filter_decisions),
         "sendable": _candidates_to_jsonable_with_decisions(sendable, send_decisions, market_filter_decisions),
@@ -80,31 +88,6 @@ def _candidates_to_jsonable_with_decisions(
         if market_filter_decisions is not None:
             item["market_filter_decision"] = market_filter_decisions.get(key, {"keep": True, "reason": "not_evaluated"})
     return payload
-
-
-def market_context_from_calibrations(
-    calibrations: list[AssetCalibration],
-    reference_symbol: str,
-    risk_off_pct_change: float,
-    risk_on_pct_change: float,
-) -> MarketContext:
-    calibration = next((item for item in calibrations if item.symbol == reference_symbol and item.rows), None)
-    if calibration is None:
-        return MarketContext(reference_symbol, 0.0, "flat", "neutral", "reference_missing")
-    latest = calibration.rows[-1]
-    if latest.pct_change <= risk_off_pct_change:
-        mode = "risk_off"
-    elif latest.pct_change >= risk_on_pct_change:
-        mode = "risk_on"
-    else:
-        mode = "neutral"
-    return MarketContext(
-        reference_symbol=reference_symbol,
-        pct_change=latest.pct_change,
-        direction=latest.direction,
-        mode=mode,
-        reason=f"{reference_symbol} {latest.pct_change:+.2f}%",
-    )
 
 
 def _rerank_candidates(candidates: list[SignalCandidate], global_limit: int) -> list[SignalCandidate]:
@@ -153,14 +136,26 @@ def apply_market_filter(
     return _rerank_candidates(kept, global_limit), filtered, decisions
 
 
-def _calibrate_symbol(symbol: str, config: AppConfig, start_ms: int, end_ms: int) -> AssetCalibration | None:
-    client = BinanceClient()
+def _calibrate_symbol(
+    symbol: str,
+    config: AppConfig,
+    start_ms: int,
+    end_ms: int,
+    client: BinanceClient,
+) -> AssetCalibration | None:
     candles = client.klines(symbol, config.interval, start_ms, end_ms)
     candles_per_day = 6 if config.interval == "4h" else 24 if config.interval == "1h" else 1
     min_candles = max(config.rolling_bars + 10, config.min_history_days * candles_per_day)
     if len(candles) < min_candles:
         return None
-    return calibrate_asset(symbol, candles, rolling_bars=config.rolling_bars)
+    return calibrate_asset(
+        symbol,
+        candles,
+        rolling_bars=config.rolling_bars,
+        watch_pct=config.watch_pct,
+        signal_pct=config.signal_pct,
+        critical_pct=config.critical_pct,
+    )
 
 
 def _calibrate_symbol_with_params(
@@ -170,14 +165,24 @@ def _calibrate_symbol_with_params(
     min_history_days: int,
     start_ms: int,
     end_ms: int,
+    client: BinanceClient,
+    watch_pct: float,
+    signal_pct: float,
+    critical_pct: float,
 ) -> AssetCalibration | None:
-    client = BinanceClient()
     candles = client.klines(symbol, interval, start_ms, end_ms)
     candles_per_day = 6 if interval == "4h" else 24 if interval == "1h" else 1
     min_candles = max(rolling_bars + 10, min_history_days * candles_per_day)
     if len(candles) < min_candles:
         return None
-    return calibrate_asset(symbol, candles, rolling_bars=rolling_bars)
+    return calibrate_asset(
+        symbol,
+        candles,
+        rolling_bars=rolling_bars,
+        watch_pct=watch_pct,
+        signal_pct=signal_pct,
+        critical_pct=critical_pct,
+    )
 
 
 def fast_lane_candidates(
@@ -214,18 +219,24 @@ def fast_lane_candidates(
 
 def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] | None = None) -> dict:
     client = BinanceClient()
+    watchlist = WatchlistStore(config.watchlist_path)
     end_ms = client.server_time_ms()
     start_ms = end_ms - config.lookback_days * 24 * 60 * 60 * 1000
-    selected_symbols = symbols or select_top_usdt_symbols(
-        client.exchange_info(),
-        client.ticker_24hr(),
-        limit=config.symbol_limit,
-    )
+    if symbols:
+        selected_symbols = symbols
+    else:
+        top_symbols = select_top_usdt_symbols(
+            client.exchange_info(),
+            client.ticker_24hr(),
+            limit=config.symbol_limit,
+        )
+        selected_symbols = list(dict.fromkeys(top_symbols + watchlist.symbols()))
 
-    calibrations = []
+    calibrations: list[AssetCalibration] = []
+    fast_calibrations: list[AssetCalibration] = []
     with ThreadPoolExecutor(max_workers=max(1, config.scan_workers)) as executor:
         futures = {
-            executor.submit(_calibrate_symbol, symbol, config, start_ms, end_ms): symbol
+            executor.submit(_calibrate_symbol, symbol, config, start_ms, end_ms, client): symbol
             for symbol in selected_symbols
         }
         for future in as_completed(futures):
@@ -244,9 +255,21 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
         min_abs_pct_change=config.min_abs_pct_change,
         min_volume_ratio=config.min_volume_ratio,
     )
+    watchlist_symbols = set(watchlist.symbols())
+    if watchlist_symbols:
+        relaxed = select_signal_candidates(
+            calibrations,
+            global_limit=raw_limit,
+            min_abs_pct_change=config.min_abs_pct_change * config.watchlist_min_pct_factor,
+            min_volume_ratio=config.min_volume_ratio,
+        )
+        seen = {item.symbol for item in candidates}
+        for item in relaxed:
+            if item.symbol in watchlist_symbols and item.symbol not in seen:
+                candidates.append(item)
+                seen.add(item.symbol)
     if config.fast_lane_enabled:
         fast_start_ms = end_ms - config.fast_lookback_days * 24 * 60 * 60 * 1000
-        fast_calibrations = []
         with ThreadPoolExecutor(max_workers=max(1, config.scan_workers)) as executor:
             futures = {
                 executor.submit(
@@ -257,6 +280,10 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
                     config.min_history_days,
                     fast_start_ms,
                     end_ms,
+                    client,
+                    config.watch_pct,
+                    config.signal_pct,
+                    config.critical_pct,
                 ): symbol
                 for symbol in selected_symbols
             }
@@ -277,15 +304,41 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
             )
         )
     raw_candidate_count = len(candidates)
-    market_context = (
-        market_context_from_calibrations(
-            calibrations,
-            config.market_reference_symbol,
-            config.market_risk_off_pct_change,
-            config.market_risk_on_pct_change,
+    candidates = dedupe_candidates_by_symbol(candidates)
+    candidates = apply_confirmation_bonus(
+        candidates,
+        {
+            config.interval: calibrations,
+            config.fast_interval: fast_calibrations,
+        },
+        bonus=config.confirmation_bonus,
+        min_volume_ratio=config.min_volume_ratio,
+    )
+    candidates = _rerank_candidates(candidates, raw_limit)
+    market_context = None
+    if config.market_filter_enabled:
+        references = list(dict.fromkeys(config.market_reference_symbols))
+        market_context = (
+            combined_market_context(
+                calibrations,
+                references,
+                config.market_risk_off_pct_change,
+                config.market_risk_on_pct_change,
+            )
+            if len(references) > 1
+            else market_context_from_calibrations(
+                calibrations,
+                references[0],
+                config.market_risk_off_pct_change,
+                config.market_risk_on_pct_change,
+            )
         )
-        if config.market_filter_enabled
-        else None
+    sector_heat = sector_heat_to_jsonable(
+        detect_sector_heat(
+            candidates,
+            min_count=config.sector_min_count,
+            min_avg_score=config.sector_min_avg_score,
+        )
     )
     candidates, filtered, market_filter_decisions = apply_market_filter(
         candidates,
@@ -293,10 +346,16 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
         config.global_limit,
     )
     cooldown = CooldownState(config.state_path, cooldown_seconds=config.cooldown_seconds)
-    send_decisions = {
-        candidate_decision_key(candidate): cooldown.send_decision(candidate)
-        for candidate in candidates
-    }
+    send_decisions = {}
+    for candidate in candidates:
+        base = cooldown.send_decision(candidate)
+        override = watchlist_send_override(
+            watchlist.get(candidate.symbol),
+            candidate.level,
+            base["send"],
+            base["reason"],
+        )
+        send_decisions[candidate_decision_key(candidate)] = override
     sendable = [
         candidate
         for candidate in candidates
@@ -314,6 +373,22 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
             send_message(config.telegram_bot_token, config.telegram_chat_id, candidate_to_message(candidate))
             cooldown.record_sent(candidate)
             sent_symbols.append(candidate.symbol)
+        for heat in sector_heat:
+            if heat["count"] >= config.sector_alert_min_count:
+                direction = "yükseliş" if heat["direction"] == "up" else "düşüş"
+                symbols_text = ", ".join(heat["symbols"][:6])
+                send_message(
+                    config.telegram_bot_token,
+                    config.telegram_chat_id,
+                    "\n".join(
+                        [
+                            f"🧺 SEKTÖR ISINMASI | {heat['label']}",
+                            f"{heat['count']} coin aynı yönde ({direction})",
+                            f"Ort. skor: {heat['avg_score']}",
+                            f"Semboller: {symbols_text}",
+                        ]
+                    ),
+                )
 
     payload = persist_scan_result(
         config.output_dir,
@@ -329,6 +404,9 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
         config.interval,
         config.lookback_days,
         raw_candidate_count=raw_candidate_count,
+        sector_heat=sector_heat,
+        watchlist_symbols=watchlist.symbols(),
     )
     payload["sent_symbols"] = sent_symbols
+    payload["sector_heat"] = sector_heat
     return payload

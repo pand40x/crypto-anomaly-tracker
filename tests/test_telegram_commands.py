@@ -10,10 +10,11 @@ from anomaly_tracker.telegram_commands import (
 
 class TelegramCommandTests(unittest.TestCase):
     def test_normalize_command_accepts_mentions_and_aliases(self):
-        self.assertEqual(normalize_command("/status@panda0x001_bot"), "/status")
-        self.assertEqual(normalize_command("/durum"), "/status")
-        self.assertEqual(normalize_command("/sinyaller"), "/signals")
-        self.assertEqual(normalize_command("selam"), None)
+        self.assertEqual(normalize_command("/status@panda0x001_bot"), ("/status", []))
+        self.assertEqual(normalize_command("/durum"), ("/status", []))
+        self.assertEqual(normalize_command("/sinyaller"), ("/signals", []))
+        self.assertEqual(normalize_command("/izle BTC ai"), ("/watch_add", ["BTC", "ai"]))
+        self.assertEqual(normalize_command("selam"), (None, []))
 
     def test_status_message_is_product_like_and_safe(self):
         text = build_status_message(

@@ -54,11 +54,22 @@ class AppConfig:
     telegram_chat_id: str | None
     market_filter_enabled: bool
     market_reference_symbol: str
+    market_reference_symbols: tuple[str, ...]
     market_risk_off_pct_change: float
     market_risk_on_pct_change: float
     telegram_commands_enabled: bool
     telegram_poll_timeout_seconds: int
     public_base_url: str | None
+    scan_secret: str | None
+    watch_pct: float
+    signal_pct: float
+    critical_pct: float
+    confirmation_bonus: float
+    watchlist_path: Path
+    watchlist_min_pct_factor: float
+    sector_min_count: int
+    sector_min_avg_score: float
+    sector_alert_min_count: int
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "AppConfig":
@@ -66,6 +77,10 @@ class AppConfig:
         output_dir = Path(source.get("ANOMALY_OUTPUT_DIR", "outputs/live"))
         state_path = Path(source.get("ANOMALY_STATE_PATH", str(output_dir / "state.json")))
         chat_id = source.get("TELEGRAM_CHAT_ID") or source.get("TELEGRAM_USER_ID")
+        secondary = source.get("ANOMALY_MARKET_SECONDARY_SYMBOL", "ETHUSDT").strip()
+        references = [source.get("ANOMALY_MARKET_REFERENCE_SYMBOL", "BTCUSDT").strip()]
+        if secondary and secondary not in references:
+            references.append(secondary)
         return cls(
             port=_int_env(source, "PORT", 8080),
             symbol_limit=_int_env(source, "ANOMALY_SYMBOL_LIMIT", 150),
@@ -91,10 +106,21 @@ class AppConfig:
             telegram_bot_token=source.get("TELEGRAM_BOT_TOKEN"),
             telegram_chat_id=chat_id,
             market_filter_enabled=_bool_env(source, "ANOMALY_MARKET_FILTER_ENABLED", True),
-            market_reference_symbol=source.get("ANOMALY_MARKET_REFERENCE_SYMBOL", "BTCUSDT"),
+            market_reference_symbol=references[0],
+            market_reference_symbols=tuple(references),
             market_risk_off_pct_change=_float_env(source, "ANOMALY_MARKET_RISK_OFF_PCT_CHANGE", -2.5),
             market_risk_on_pct_change=_float_env(source, "ANOMALY_MARKET_RISK_ON_PCT_CHANGE", 2.5),
             telegram_commands_enabled=_bool_env(source, "TELEGRAM_COMMANDS_ENABLED", True),
             telegram_poll_timeout_seconds=_int_env(source, "TELEGRAM_POLL_TIMEOUT_SECONDS", 25),
             public_base_url=source.get("ANOMALY_PUBLIC_BASE_URL") or None,
+            scan_secret=source.get("ANOMALY_SCAN_SECRET") or None,
+            watch_pct=_float_env(source, "ANOMALY_WATCH_PCT", 0.95),
+            signal_pct=_float_env(source, "ANOMALY_SIGNAL_PCT", 0.985),
+            critical_pct=_float_env(source, "ANOMALY_CRITICAL_PCT", 0.995),
+            confirmation_bonus=_float_env(source, "ANOMALY_CONFIRMATION_BONUS", 0.8),
+            watchlist_path=Path(source.get("ANOMALY_WATCHLIST_PATH", str(output_dir / "watchlist.json"))),
+            watchlist_min_pct_factor=_float_env(source, "ANOMALY_WATCHLIST_MIN_PCT_FACTOR", 0.5),
+            sector_min_count=_int_env(source, "ANOMALY_SECTOR_MIN_COUNT", 3),
+            sector_min_avg_score=_float_env(source, "ANOMALY_SECTOR_MIN_AVG_SCORE", 2.0),
+            sector_alert_min_count=_int_env(source, "ANOMALY_SECTOR_ALERT_MIN_COUNT", 3),
         )

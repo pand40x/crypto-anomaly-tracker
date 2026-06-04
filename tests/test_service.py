@@ -1,7 +1,7 @@
 import unittest
 
 from anomaly_tracker.runtime import AppConfig
-from anomaly_tracker.service import ScanState, dashboard_html, handle_telegram_update, health_payload, summary_payload
+from anomaly_tracker.service import ScanState, dashboard_html, handle_telegram_update, health_payload, scan_authorized, summary_payload
 
 
 class ServiceTests(unittest.TestCase):
@@ -104,7 +104,14 @@ class ServiceTests(unittest.TestCase):
         self.assertIn("BTCUSDT", html)
         self.assertIn("risk_off", html)
         self.assertIn("first_signal", html)
-        self.assertIn("Hacimli", html)
+        self.assertIn("Sektör Isınması", html)
+        self.assertIn("Bastırılan", html)
+
+    def test_scan_authorized_requires_secret_when_configured(self):
+        config = AppConfig.from_env({"ANOMALY_SCAN_SECRET": "s3cret"})
+        self.assertFalse(scan_authorized(config, {}, None))
+        self.assertTrue(scan_authorized(config, {}, "s3cret"))
+        self.assertTrue(scan_authorized(config, {"X-Anomaly-Scan-Secret": "s3cret"}, None))
 
     def test_handle_telegram_update_replies_to_allowed_chat_and_starts_scan(self):
         config = AppConfig.from_env(

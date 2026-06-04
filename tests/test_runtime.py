@@ -10,7 +10,7 @@ from anomaly_tracker.state import CooldownState
 from anomaly_tracker.telegram import build_send_message_payload
 
 
-def candidate(symbol="BTCUSDT", score=5.0, open_time=1_000_000):
+def candidate(symbol="BTCUSDT", score=5.0, open_time=1_000_000, lane="main"):
     return SignalCandidate(
         symbol=symbol,
         open_time=open_time,
@@ -21,6 +21,7 @@ def candidate(symbol="BTCUSDT", score=5.0, open_time=1_000_000):
         direction="up",
         global_rank=1,
         reason="Hacim canlandi.",
+        lane=lane,
     )
 
 
@@ -75,11 +76,21 @@ class RuntimeTests(unittest.TestCase):
 
         self.assertFalse(config.market_filter_enabled)
         self.assertEqual(config.market_reference_symbol, "ETHUSDT")
+        self.assertEqual(config.market_reference_symbols, ("ETHUSDT",))
         self.assertEqual(config.market_risk_off_pct_change, -4.0)
         self.assertEqual(config.market_risk_on_pct_change, 4.0)
         self.assertFalse(config.telegram_commands_enabled)
         self.assertEqual(config.telegram_poll_timeout_seconds, 10)
         self.assertEqual(config.public_base_url, "https://radar.example")
+
+    def test_config_reads_secondary_market_reference(self):
+        config = AppConfig.from_env(
+            {
+                "ANOMALY_MARKET_REFERENCE_SYMBOL": "BTCUSDT",
+                "ANOMALY_MARKET_SECONDARY_SYMBOL": "ETHUSDT",
+            }
+        )
+        self.assertEqual(config.market_reference_symbols, ("BTCUSDT", "ETHUSDT"))
 
     def test_cooldown_allows_stronger_resignal_inside_window(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -123,8 +134,29 @@ class RuntimeTests(unittest.TestCase):
 
             payload = json.loads(path.read_text())
 
-            self.assertEqual(payload["ETHUSDT"]["last_score"], 6.0)
-            self.assertEqual(payload["ETHUSDT"]["last_open_time"], 5000)
+            self.assertEqual(payload["ETHUSDT|main"]["last_score"], 6.0)
+            self.assertEqual(payload["ETHUSDT|main"]["last_open_time"], 5000)
+
+    def test_cooldown_isolated_per_lane(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = CooldownState(Path(tmp) / "state.json", cooldown_seconds=12 * 3600)
+            main = candidate(symbol="BTCUSDT", score=5.0, open_time=1000, lane="main")
+            fast = SignalCandidate(
+                symbol="BTCUSDT",
+                open_time=2000,
+                close=100_000.0,
+                pct_change=2.0,
+                score=5.1,
+                level="critical",
+                direction="up",
+                global_rank=1,
+                reason="hacimli alim",
+                source_interval="1h",
+                lane="fast",
+            )
+            state.record_sent(main)
+            self.assertFalse(state.should_send(main))
+            self.assertTrue(state.should_send(fast))
 
     def test_telegram_payload_uses_chat_id_and_markdown_disabled(self):
         payload = build_send_message_payload("99", "hello")

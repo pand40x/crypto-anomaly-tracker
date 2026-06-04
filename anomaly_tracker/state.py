@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from anomaly_tracker.candidates import cooldown_key
 from anomaly_tracker.models import SignalCandidate
 
 
@@ -22,7 +23,7 @@ class CooldownState:
         return bool(self.send_decision(candidate)["send"])
 
     def send_decision(self, candidate: SignalCandidate) -> dict:
-        previous = self._state.get(candidate.symbol)
+        previous = self._state.get(cooldown_key(candidate))
         if not previous:
             return {
                 "send": True,
@@ -54,7 +55,7 @@ class CooldownState:
         }
 
     def record_sent(self, candidate: SignalCandidate) -> None:
-        self._state[candidate.symbol] = {
+        self._state[cooldown_key(candidate)] = {
             "last_open_time": candidate.open_time,
             "last_score": candidate.score,
             "last_level": candidate.level,

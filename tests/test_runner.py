@@ -4,10 +4,10 @@ import unittest
 from pathlib import Path
 
 from anomaly_tracker.models import AssetCalibration, MarketContext, ScoredRow, SignalCandidate, Thresholds
+from anomaly_tracker.market import market_context_from_calibrations
 from anomaly_tracker.runner import (
     apply_market_filter,
     candidate_decision_key,
-    market_context_from_calibrations,
     persist_scan_result,
 )
 

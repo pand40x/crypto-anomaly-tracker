@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 
+from anomaly_tracker.backtest import run_backtest
 from anomaly_tracker.runner import run_scan
 from anomaly_tracker.runtime import AppConfig
 from anomaly_tracker.service import serve
@@ -44,6 +45,28 @@ def serve_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def backtest(args: argparse.Namespace) -> int:
+    symbols = _parse_symbols(args.symbols) or ["BTCUSDT", "ETHUSDT"]
+    result = run_backtest(
+        symbols,
+        interval=args.interval,
+        lookback_days=args.lookback_days,
+        rolling_bars=args.rolling_bars,
+        forward_bars=args.forward_bars,
+    )
+    print(
+        "events={event_count} aligned={aligned_count} rate={alignment_rate} avg_fwd={avg_forward_pct}".format(
+            **result
+        )
+    )
+    for event in result["events"][-5:]:
+        print(
+            f"{event['symbol']} {event['level']} {event['direction']} "
+            f"score={event['score']:.2f} fwd={event['forward_pct']:+.2f}%"
+        )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="anomaly-tracker")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -63,6 +86,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     serve_parser = subparsers.add_parser("serve", help="run HTTP service and background scheduler")
     serve_parser.set_defaults(func=serve_command)
+
+    backtest_parser = subparsers.add_parser("backtest", help="evaluate historical signal alignment")
+    backtest_parser.add_argument("--symbols", help="comma separated symbols")
+    backtest_parser.add_argument("--interval", choices=INTERVALS, default="4h")
+    backtest_parser.add_argument("--lookback-days", type=int, default=180)
+    backtest_parser.add_argument("--rolling-bars", type=int, default=42)
+    backtest_parser.add_argument("--forward-bars", type=int, default=6)
+    backtest_parser.set_defaults(func=backtest)
     return parser
 
 

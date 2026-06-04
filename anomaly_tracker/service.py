@@ -48,6 +48,7 @@ def health_payload(config: AppConfig, state: "ScanState | None" = None) -> dict:
         "run_on_start": config.run_on_start,
         "market_filter_enabled": config.market_filter_enabled,
         "market_reference_symbol": config.market_reference_symbol,
+        "market_reference_symbols": list(config.market_reference_symbols),
         "telegram_configured": bool(config.telegram_bot_token and config.telegram_chat_id),
         "telegram_commands_enabled": bool(
             config.telegram_commands_enabled and config.telegram_bot_token and config.telegram_chat_id
@@ -208,10 +209,9 @@ def summary_payload(config: AppConfig, state: ScanState, signals: dict) -> dict:
     }
 
 
-def dashboard_html(health: dict, signals: dict) -> str:
-    candidates = signals.get("candidates") or []
+def _candidate_cards(items: list[dict], empty_text: str) -> str:
     cards = []
-    for candidate in candidates[:20]:
+    for candidate in items[:20]:
         send_decision = candidate.get("send_decision") or {}
         filter_decision = candidate.get("market_filter_decision") or {}
         message = escape(str(candidate.get("message", "")))
@@ -219,17 +219,66 @@ def dashboard_html(health: dict, signals: dict) -> str:
             "\n".join(
                 [
                     "<article class=\"card\">",
-                    f"<h2>{escape(str(candidate.get('symbol', 'unknown')))}</h2>",
+                    f"<h3>{escape(str(candidate.get('symbol', 'unknown')))}</h3>",
                     f"<pre>{message}</pre>",
-                    f"<p>Send: {escape(str(send_decision.get('reason', 'unknown')))}</p>",
-                    f"<p>Filter: {escape(str(filter_decision.get('reason', 'not_evaluated')))}</p>",
+                    f"<p class=\"meta\">Send: {escape(str(send_decision.get('reason', 'unknown')))}</p>",
+                    f"<p class=\"meta\">Filter: {escape(str(filter_decision.get('reason', 'not_evaluated')))}</p>",
                     "</article>",
                 ]
             )
         )
     if not cards:
-        cards.append("<article class=\"card\"><h2>Sinyal yok</h2><p>Son taramada aday üretilmedi.</p></article>")
+        cards.append(f"<article class=\"card\"><p>{escape(empty_text)}</p></article>")
+    return "".join(cards)
+
+
+def _sector_cards(sector_heat: list[dict]) -> str:
+    if not sector_heat:
+        return "<article class=\"card\"><p>Sektör ısınması yok.</p></article>"
+    cards = []
+    for heat in sector_heat[:8]:
+        direction = "yükseliş" if heat.get("direction") == "up" else "düşüş"
+        cards.append(
+            "\n".join(
+                [
+                    "<article class=\"card\">",
+                    f"<h3>{escape(str(heat.get('label', heat.get('sector_id', 'sektor'))))}</h3>",
+                    f"<p>{heat.get('count', 0)} coin · {escape(direction)} · skor {heat.get('avg_score', 0)}</p>",
+                    f"<p class=\"meta\">{escape(', '.join(heat.get('symbols') or []))}</p>",
+                    "</article>",
+                ]
+            )
+        )
+    return "".join(cards)
+
+
+def _run_rows(recent_runs: list[dict]) -> str:
+    if not recent_runs:
+        return "<tr><td colspan=\"4\">Henüz tarama kaydı yok.</td></tr>"
+    rows = []
+    for run in reversed(recent_runs[-8:]):
+        summary = run.get("result_summary") or {}
+        rows.append(
+            "<tr>"
+            f"<td>{escape(str(run.get('status', '-')))}</td>"
+            f"<td>{escape(str(run.get('finished_at', '-')))}</td>"
+            f"<td>{escape(str(run.get('duration_seconds', '-')))}</td>"
+            f"<td>{summary.get('candidate_count', 0)} / {summary.get('sendable_count', 0)}</td>"
+            "</tr>"
+        )
+    return "".join(rows)
+
+
+def scan_authorized(config: AppConfig, headers: dict[str, str], query_secret: str | None) -> bool:
+    if not config.scan_secret:
+        return True
+    header_secret = headers.get("X-Anomaly-Scan-Secret") or headers.get("x-anomaly-scan-secret")
+    return query_secret == config.scan_secret or header_secret == config.scan_secret
+
+
+def dashboard_html(health: dict, signals: dict) -> str:
     market = signals.get("market_context") or {}
+    watchlist = signals.get("watchlist_symbols") or []
     return f"""<!doctype html>
 <html lang=\"tr\">
 <head>
@@ -238,26 +287,55 @@ def dashboard_html(health: dict, signals: dict) -> str:
   <meta http-equiv=\"refresh\" content=\"60\">
   <title>crypto-anomaly-tracker</title>
   <style>
-    body {{ margin: 0; background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-    main {{ max-width: 980px; margin: 0 auto; padding: 24px; }}
-    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }}
+    body {{ margin: 0; background: #0b1220; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+    main {{ max-width: 1100px; margin: 0 auto; padding: 24px; }}
+    h1, h2 {{ margin: 0 0 12px; }}
+    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }}
     .card, .stat {{ border: 1px solid #334155; border-radius: 14px; background: #111827; padding: 16px; }}
+    .meta {{ color: #94a3b8; font-size: 13px; }}
     pre {{ white-space: pre-wrap; color: #f8fafc; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+    th, td {{ border-bottom: 1px solid #334155; padding: 8px; text-align: left; }}
     a {{ color: #38bdf8; }}
+    section {{ margin-top: 28px; }}
   </style>
 </head>
 <body>
 <main>
   <h1>crypto-anomaly-tracker</h1>
-  <p>Hacimli hareketleri, piyasa filtresini ve Telegram gönderim kararlarını izler.</p>
+  <p>Operasyon paneli — sinyaller, filtreler, sektör ısınması ve izleme listesi.</p>
   <section class=\"grid\">
-    <div class=\"stat\"><strong>Service</strong><br>{escape(str(health.get("status", "unknown")))} / running={escape(str(health.get("running", False)))}</div>
-    <div class=\"stat\"><strong>Signals</strong><br>{escape(str(signals.get("candidate_count", 0)))} kept, {escape(str(signals.get("filtered_count", 0)))} filtered</div>
-    <div class=\"stat\"><strong>Market</strong><br>{escape(str(market.get("reference_symbol", "-")))} {escape(str(market.get("mode", "neutral")))}</div>
+    <div class=\"stat\"><strong>Servis</strong><br>{escape(str(health.get("status", "unknown")))} · running={escape(str(health.get("running", False)))}</div>
+    <div class=\"stat\"><strong>Son tarama</strong><br>{escape(str(health.get("last_scan_duration_seconds", "-")))} sn</div>
+    <div class=\"stat\"><strong>Adaylar</strong><br>{signals.get("candidate_count", 0)} aday · {signals.get("sendable_count", 0)} gönderilebilir</div>
+    <div class=\"stat\"><strong>Piyasa</strong><br>{escape(str(market.get("reference_symbol", "-")))} · {escape(str(market.get("mode", "neutral")))}</div>
+    <div class=\"stat\"><strong>İzleme</strong><br>{len(watchlist)} sembol</div>
+    <div class=\"stat\"><strong>Başarı</strong><br>{health.get("success_count", 0)} / {health.get("scan_count", 0)}</div>
   </section>
-  <h2>Son Sinyaller</h2>
-  <section class=\"grid\">
-    {"".join(cards)}
+  <section>
+    <h2>Son Taramalar</h2>
+    <div class=\"card\">
+      <table>
+        <thead><tr><th>Durum</th><th>Bitiş</th><th>Süre</th><th>Aday/Gönder</th></tr></thead>
+        <tbody>{_run_rows(health.get("recent_runs") or [])}</tbody>
+      </table>
+    </div>
+  </section>
+  <section>
+    <h2>Sektör Isınması</h2>
+    <div class=\"grid\">{_sector_cards(signals.get("sector_heat") or [])}</div>
+  </section>
+  <section>
+    <h2>Aktif Sinyaller</h2>
+    <div class=\"grid\">{_candidate_cards(signals.get("candidates") or [], "Son taramada aktif sinyal yok.")}</div>
+  </section>
+  <section>
+    <h2>Filtrelenen</h2>
+    <div class=\"grid\">{_candidate_cards(signals.get("filtered") or [], "Filtrelenen aday yok.")}</div>
+  </section>
+  <section>
+    <h2>Bastırılan</h2>
+    <div class=\"grid\">{_candidate_cards(signals.get("suppressed") or [], "Cooldown ile bastırılan aday yok.")}</div>
   </section>
   <p><a href=\"/summary\">/summary</a> · <a href=\"/signals\">/signals</a> · <a href=\"/health\">/health</a></p>
 </main>
@@ -283,7 +361,13 @@ def handle_telegram_update(
         return False
     with state.lock:
         health = health_payload(config, state)
-    response, action = command_response(text, health, read_signals(), config.public_base_url)
+    response, action = command_response(
+        text,
+        health,
+        read_signals(),
+        config.public_base_url,
+        config.watchlist_path,
+    )
     if response is None:
         return False
     if action == "scan":
@@ -407,6 +491,9 @@ def make_handler(config: AppConfig, state: ScanState):
                 _json_response(self, 404, {"error": "not_found"})
                 return
             params = parse_qs(parsed.query)
+            if not scan_authorized(config, dict(self.headers.items()), params.get("secret", [None])[0]):
+                _json_response(self, 401, {"error": "unauthorized"})
+                return
             send = params.get("send", ["0"])[0] in {"1", "true", "yes"}
             try:
                 _json_response(self, 200, _run_scan_locked(config, state, send_telegram=send))

@@ -10,6 +10,12 @@ Run tests:
 rtk python3 -m unittest discover -s tests -v
 ```
 
+Run a backtest on historical alignment:
+
+```bash
+rtk python3 -m anomaly_tracker.cli backtest --symbols BTCUSDT,ETHUSDT --lookback-days 180 --forward-bars 6
+```
+
 Run a manual BTC/ETH scan:
 
 ```bash
@@ -35,7 +41,7 @@ Routes:
 - `GET /summary`
 - `GET /dashboard`
 - `POST /scan`
-- `POST /scan?send=1`
+- `POST /scan?send=1` (optional `?secret=` or `X-Anomaly-Scan-Secret` when `ANOMALY_SCAN_SECRET` is set)
 
 Telegram commands are enabled when `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`/`TELEGRAM_USER_ID` are set:
 
@@ -44,6 +50,12 @@ Telegram commands are enabled when `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`/`
 - `/scan` or `/tara`
 - `/dashboard` or `/panel`
 - `/help`
+- `/izle BTC [etiket...]` — izleme listesine ekle
+- `/izleme` — izleme listesi
+- `/kaldir BTC` — listeden çıkar
+- `/mod BTC instant|digest|critical_only`
+- `/sektor [ai|meme|l2|...]` — sektör ısınması
+- `/sektorler` — sektör listesi
 
 ## Algorithm
 
