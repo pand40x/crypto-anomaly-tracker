@@ -5,7 +5,39 @@ from anomaly_tracker.outputs import candidate_to_message, candidates_to_jsonable
 
 
 class OutputTests(unittest.TestCase):
-    def test_candidate_to_message_is_human_readable(self):
+    def test_candidate_to_message_is_readable_telegram_card(self):
+        candidate = SignalCandidate(
+            symbol="HOMEUSDT",
+            open_time=1_780_000_000_000,
+            close=0.0506,
+            pct_change=36.89,
+            score=6.2,
+            level="critical",
+            direction="up",
+            global_rank=1,
+            reason="hacimli alim, genis mum",
+            source_interval="4h",
+            quote_volume=13_800_000,
+        )
+
+        message = candidate_to_message(candidate)
+
+        self.assertEqual(
+            message,
+            "\n".join(
+                [
+                    "HOME | $0.0506 | 4s +36.89%",
+                    "Onem: kritik | Yon: alim | Sira: #1 | Skor: 6.20",
+                    "Sebep: hacimli alim, genis mum",
+                    "Hacim: $13.8M",
+                ]
+            ),
+        )
+        self.assertIn("$0.0506", message)
+        self.assertNotIn("x canlandi", message)
+        self.assertNotIn("haber iddiasi", message)
+
+    def test_candidate_to_message_marks_fast_lane_on_first_line(self):
         candidate = SignalCandidate(
             symbol="BTCUSDT",
             open_time=1_780_000_000_000,
@@ -23,13 +55,9 @@ class OutputTests(unittest.TestCase):
 
         message = candidate_to_message(candidate)
 
-        self.assertEqual(
-            message,
-            "BTC | $109,250 | 1s +2.40% | Sebep: hacimli alim, band kirilimi | Hacim: $12.4M | FAST",
-        )
-        self.assertIn("$109,250", message)
-        self.assertNotIn("x canlandi", message)
-        self.assertNotIn("haber iddiasi", message)
+        self.assertEqual(message.splitlines()[0], "BTC | $109,250 | 1s +2.40% | FAST")
+        self.assertIn("Onem: sinyal", message)
+        self.assertIn("Hacim: $12.4M", message)
 
     def test_candidates_to_jsonable_preserves_rank_and_reason(self):
         candidate = SignalCandidate(

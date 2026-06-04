@@ -67,6 +67,27 @@ class RuntimeTests(unittest.TestCase):
             self.assertFalse(state.should_send(same))
             self.assertTrue(state.should_send(stronger))
 
+    def test_cooldown_explains_first_suppressed_and_stronger_decisions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = CooldownState(Path(tmp) / "state.json", cooldown_seconds=12 * 3600)
+
+            first = candidate(score=5.0, open_time=1000)
+            same = candidate(score=5.2, open_time=2000)
+            stronger = candidate(score=5.8, open_time=3000)
+
+            self.assertEqual(state.send_decision(first)["reason"], "first_signal")
+            self.assertTrue(state.send_decision(first)["send"])
+            state.record_sent(first)
+
+            same_decision = state.send_decision(same)
+            self.assertFalse(same_decision["send"])
+            self.assertEqual(same_decision["reason"], "cooldown")
+            self.assertEqual(same_decision["previous_score"], 5.0)
+
+            stronger_decision = state.send_decision(stronger)
+            self.assertTrue(stronger_decision["send"])
+            self.assertEqual(stronger_decision["reason"], "stronger_signal")
+
     def test_cooldown_persists_state_to_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "state.json"

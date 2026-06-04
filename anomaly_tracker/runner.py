@@ -19,6 +19,8 @@ def persist_scan_result(
     calibrations: list[AssetCalibration],
     candidates: list[SignalCandidate],
     sendable: list[SignalCandidate],
+    suppressed: list[SignalCandidate],
+    send_decisions: dict[str, dict],
     symbols_scanned: list[str],
     interval: str,
     lookback_days: int,
@@ -30,11 +32,25 @@ def persist_scan_result(
         "symbols_scanned": symbols_scanned,
         "candidate_count": len(candidates),
         "sendable_count": len(sendable),
-        "candidates": candidates_to_jsonable(candidates),
-        "sendable": candidates_to_jsonable(sendable),
+        "suppressed_count": len(suppressed),
+        "send_decisions": send_decisions,
+        "candidates": _candidates_to_jsonable_with_decisions(candidates, send_decisions),
+        "sendable": _candidates_to_jsonable_with_decisions(sendable, send_decisions),
+        "suppressed": _candidates_to_jsonable_with_decisions(suppressed, send_decisions),
     }
     (output_dir / "latest_crypto_signals.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     (output_dir / "latest_crypto_scan.md").write_text(markdown_report(calibrations, candidates), encoding="utf-8")
+    return payload
+
+
+def candidate_decision_key(candidate: SignalCandidate) -> str:
+    return f"{candidate.symbol}|{candidate.source_interval}|{candidate.lane}|{candidate.open_time}"
+
+
+def _candidates_to_jsonable_with_decisions(candidates: list[SignalCandidate], send_decisions: dict[str, dict]) -> list[dict]:
+    payload = candidates_to_jsonable(candidates)
+    for item, candidate in zip(payload, candidates):
+        item["send_decision"] = send_decisions.get(candidate_decision_key(candidate), {"send": False, "reason": "unknown"})
     return payload
 
 
@@ -167,7 +183,20 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
             for index, item in enumerate(candidates, start=1)
         ]
     cooldown = CooldownState(config.state_path, cooldown_seconds=config.cooldown_seconds)
-    sendable = [candidate for candidate in candidates if cooldown.should_send(candidate)]
+    send_decisions = {
+        candidate_decision_key(candidate): cooldown.send_decision(candidate)
+        for candidate in candidates
+    }
+    sendable = [
+        candidate
+        for candidate in candidates
+        if send_decisions[candidate_decision_key(candidate)]["send"]
+    ]
+    suppressed = [
+        candidate
+        for candidate in candidates
+        if not send_decisions[candidate_decision_key(candidate)]["send"]
+    ]
 
     sent_symbols: list[str] = []
     if send_telegram and config.telegram_bot_token and config.telegram_chat_id:
@@ -181,6 +210,8 @@ def run_scan(config: AppConfig, send_telegram: bool = False, symbols: list[str] 
         calibrations,
         candidates,
         sendable,
+        suppressed,
+        send_decisions,
         [item.symbol for item in calibrations],
         config.interval,
         config.lookback_days,

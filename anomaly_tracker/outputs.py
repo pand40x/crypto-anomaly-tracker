@@ -37,15 +37,35 @@ def display_symbol(symbol: str) -> str:
     return symbol[:-4] if symbol.endswith("USDT") else symbol
 
 
+def _level_text(level: str) -> str:
+    return {
+        "critical": "kritik",
+        "signal": "sinyal",
+        "watch": "izleme",
+    }.get(level, level)
+
+
+def _direction_text(direction: str) -> str:
+    return {
+        "up": "alim",
+        "down": "satis",
+    }.get(direction, direction)
+
+
 def candidate_to_message(candidate: SignalCandidate) -> str:
     interval_text = {"1h": "1s", "4h": "4s", "1d": "1g"}.get(candidate.source_interval, candidate.source_interval)
     lane_text = " | FAST" if candidate.lane == "fast" else ""
-    volume_text = f" | Hacim: {format_compact_usd(candidate.quote_volume)}" if candidate.quote_volume > 0 else ""
-    return (
-        f"{display_symbol(candidate.symbol)} | {format_price(candidate.close)} | "
-        f"{interval_text} {candidate.pct_change:+.2f}% | Sebep: {candidate.reason}"
-        f"{volume_text}{lane_text}"
-    )
+    lines = [
+        f"{display_symbol(candidate.symbol)} | {format_price(candidate.close)} | {interval_text} {candidate.pct_change:+.2f}%{lane_text}",
+        (
+            f"Onem: {_level_text(candidate.level)} | Yon: {_direction_text(candidate.direction)} | "
+            f"Sira: #{candidate.global_rank} | Skor: {candidate.score:.2f}"
+        ),
+        f"Sebep: {candidate.reason}",
+    ]
+    if candidate.quote_volume > 0:
+        lines.append(f"Hacim: {format_compact_usd(candidate.quote_volume)}")
+    return "\n".join(lines)
 
 
 def candidates_to_jsonable(candidates: list[SignalCandidate]) -> list[dict]:
@@ -83,10 +103,11 @@ def markdown_report(calibrations: list[AssetCalibration], candidates: list[Signa
         lines.append("| - | - | - | - | - | - | - | Sinyal yok |")
     for item in candidates:
         direction = "yukari" if item.direction == "up" else "asagi"
+        message = candidate_to_message(item).replace("\n", " / ")
         lines.append(
             f"| {item.global_rank} | {item.symbol} | {item.level} | {direction} | "
             f"{format_usd(item.close)} | {item.pct_change:+.2f}% | {item.score:.2f} | "
-            f"{candidate_to_message(item)} |"
+            f"{message} |"
         )
 
     lines.extend(["", "## Asset Esikleri", "", "| Asset | Watch | Signal | Critical | Son Skor |", "|---|---:|---:|---:|---:|"])
