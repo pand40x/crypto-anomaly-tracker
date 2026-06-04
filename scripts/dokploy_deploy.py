@@ -58,7 +58,7 @@ def env_text() -> str:
     return "\n".join(
         [
             "PORT=8080",
-            f"PUBLISHED_PORT={os.environ.get('PUBLISHED_PORT', '18080')}",
+            f"ANOMALY_PUBLIC_BASE_URL={os.environ.get('ANOMALY_PUBLIC_BASE_URL', 'https://anomaly.anilsahin.tr')}",
             f"ANOMALY_SYMBOL_LIMIT={os.environ.get('ANOMALY_SYMBOL_LIMIT', '150')}",
             f"ANOMALY_GLOBAL_LIMIT={os.environ.get('ANOMALY_GLOBAL_LIMIT', '10')}",
             f"ANOMALY_INTERVAL={os.environ.get('ANOMALY_INTERVAL', '4h')}",

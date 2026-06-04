@@ -14,7 +14,7 @@ telegram_user_id="$(get_secret TELEGRAM_USER_ID)"
 
 cat > "$output" <<EOF
 PORT=8080
-PUBLISHED_PORT=18080
+ANOMALY_PUBLIC_BASE_URL=https://anomaly.anilsahin.tr
 ANOMALY_SYMBOL_LIMIT=150
 ANOMALY_GLOBAL_LIMIT=10
 ANOMALY_INTERVAL=4h

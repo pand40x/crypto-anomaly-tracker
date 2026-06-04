@@ -9,10 +9,9 @@ services:
         required: false
     environment:
       PORT: ${PORT:-8080}
+      ANOMALY_PUBLIC_BASE_URL: ${ANOMALY_PUBLIC_BASE_URL:-https://anomaly.anilsahin.tr}
       ANOMALY_OUTPUT_DIR: /app/outputs/live
       ANOMALY_STATE_PATH: /app/outputs/live/state.json
-    ports:
-      - "${PUBLISHED_PORT:-18080}:8080"
     volumes:
       - anomaly-tracker-data:/app/outputs/live
     healthcheck:
