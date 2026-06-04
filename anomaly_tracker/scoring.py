@@ -4,7 +4,7 @@ import math
 import statistics
 
 from anomaly_tracker.humanize import explain_move
-from anomaly_tracker.models import AssetCalibration, Candle, ScoredRow, SignalCandidate, Thresholds
+from anomaly_tracker.models import AssetCalibration, Candle, MarketContext, ScoredRow, SignalCandidate, Thresholds
 
 
 def _median(values: list[float]) -> float:
@@ -181,3 +181,15 @@ def select_signal_candidates(
         )
         for index, row in enumerate(ranked, start=1)
     ]
+
+
+def market_filter_decision(candidate: SignalCandidate, context: MarketContext) -> dict:
+    if context.mode == "risk_off" and candidate.direction == "up":
+        if candidate.level == "critical":
+            return {"keep": True, "reason": "critical_override", "market_mode": context.mode}
+        return {"keep": False, "reason": "risk_off_weak_bullish", "market_mode": context.mode}
+    if context.mode == "risk_on" and candidate.direction == "down":
+        if candidate.level == "critical":
+            return {"keep": True, "reason": "critical_override", "market_mode": context.mode}
+        return {"keep": False, "reason": "risk_on_weak_bearish", "market_mode": context.mode}
+    return {"keep": True, "reason": "market_aligned_or_neutral", "market_mode": context.mode}

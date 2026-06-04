@@ -1,7 +1,7 @@
 import unittest
 
 from anomaly_tracker.runtime import AppConfig
-from anomaly_tracker.service import health_payload
+from anomaly_tracker.service import ScanState, dashboard_html, health_payload, summary_payload
 
 
 class ServiceTests(unittest.TestCase):
@@ -25,6 +25,86 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(payload["telegram_configured"])
         self.assertNotIn("secret", str(payload))
 
+    def test_scan_state_records_success_error_and_next_due_metadata(self):
+        state = ScanState()
+
+        state.record_start(now=100.0)
+        state.record_success(
+            {
+                "candidate_count": 2,
+                "sendable_count": 1,
+                "suppressed_count": 1,
+                "sent_symbols": ["BTCUSDT"],
+            },
+            now=130.5,
+        )
+        state.mark_next_due(200.0)
+
+        self.assertFalse(state.running)
+        self.assertEqual(state.scan_count, 1)
+        self.assertEqual(state.success_count, 1)
+        self.assertEqual(state.failure_count, 0)
+        self.assertEqual(state.last_scan_duration_seconds, 30.5)
+        self.assertEqual(state.last_result_summary["candidate_count"], 2)
+        self.assertEqual(state.next_scan_due_at, "1970-01-01T00:03:20Z")
+
+        state.record_start(now=220.0)
+        state.record_error(ValueError("boom"), now=225.0)
+
+        self.assertEqual(state.scan_count, 2)
+        self.assertEqual(state.failure_count, 1)
+        self.assertEqual(state.last_error, "boom")
+        self.assertEqual(state.recent_runs[-1]["status"], "error")
+
+    def test_health_payload_includes_scan_lifecycle_when_state_is_provided(self):
+        config = AppConfig.from_env({"TELEGRAM_USER_ID": "42"})
+        state = ScanState()
+        state.record_start(now=100.0)
+        state.record_success({"candidate_count": 0, "sendable_count": 0}, now=101.25)
+
+        payload = health_payload(config, state)
+
+        self.assertFalse(payload["running"])
+        self.assertEqual(payload["scan_count"], 1)
+        self.assertEqual(payload["success_count"], 1)
+        self.assertEqual(payload["last_scan_duration_seconds"], 1.25)
+        self.assertEqual(payload["last_success_at"], "1970-01-01T00:01:41Z")
+        self.assertEqual(payload["last_result_summary"]["candidate_count"], 0)
+
+    def test_summary_payload_combines_health_and_signals(self):
+        config = AppConfig.from_env({"TELEGRAM_USER_ID": "42"})
+        state = ScanState()
+        signals = {"candidate_count": 1, "sendable_count": 1, "candidates": [{"symbol": "BTCUSDT"}]}
+
+        payload = summary_payload(config, state, signals)
+
+        self.assertEqual(payload["health"]["status"], "ok")
+        self.assertEqual(payload["signals"]["candidate_count"], 1)
+        self.assertNotIn("secret", str(payload))
+
+    def test_dashboard_html_renders_safe_signal_cards(self):
+        health = {"status": "ok", "running": False, "last_error": None}
+        signals = {
+            "candidate_count": 1,
+            "sendable_count": 1,
+            "suppressed_count": 0,
+            "market_context": {"mode": "risk_off", "reference_symbol": "BTCUSDT"},
+            "candidates": [
+                {
+                    "symbol": "BTCUSDT",
+                    "message": "BTC | $100 | 4s +2.00%\nSebep: hacimli alim",
+                    "send_decision": {"send": True, "reason": "first_signal"},
+                }
+            ],
+        }
+
+        html = dashboard_html(health, signals)
+
+        self.assertIn("crypto-anomaly-tracker", html)
+        self.assertIn("BTCUSDT", html)
+        self.assertIn("risk_off", html)
+        self.assertIn("first_signal", html)
+        self.assertIn("Hacimli", html)
 
 if __name__ == "__main__":
     unittest.main()

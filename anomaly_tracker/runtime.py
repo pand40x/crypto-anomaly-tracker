@@ -52,6 +52,10 @@ class AppConfig:
     state_path: Path
     telegram_bot_token: str | None
     telegram_chat_id: str | None
+    market_filter_enabled: bool
+    market_reference_symbol: str
+    market_risk_off_pct_change: float
+    market_risk_on_pct_change: float
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "AppConfig":
@@ -83,4 +87,8 @@ class AppConfig:
             state_path=state_path,
             telegram_bot_token=source.get("TELEGRAM_BOT_TOKEN"),
             telegram_chat_id=chat_id,
+            market_filter_enabled=_bool_env(source, "ANOMALY_MARKET_FILTER_ENABLED", True),
+            market_reference_symbol=source.get("ANOMALY_MARKET_REFERENCE_SYMBOL", "BTCUSDT"),
+            market_risk_off_pct_change=_float_env(source, "ANOMALY_MARKET_RISK_OFF_PCT_CHANGE", -2.5),
+            market_risk_on_pct_change=_float_env(source, "ANOMALY_MARKET_RISK_ON_PCT_CHANGE", 2.5),
         )

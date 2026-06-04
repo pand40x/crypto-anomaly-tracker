@@ -53,6 +53,25 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(config.fast_min_volume_ratio, 3.0)
         self.assertFalse(config.run_on_start)
         self.assertEqual(config.telegram_chat_id, "12345")
+        self.assertTrue(config.market_filter_enabled)
+        self.assertEqual(config.market_reference_symbol, "BTCUSDT")
+        self.assertEqual(config.market_risk_off_pct_change, -2.5)
+        self.assertEqual(config.market_risk_on_pct_change, 2.5)
+
+    def test_config_reads_market_filter_overrides(self):
+        config = AppConfig.from_env(
+            {
+                "ANOMALY_MARKET_FILTER_ENABLED": "false",
+                "ANOMALY_MARKET_REFERENCE_SYMBOL": "ETHUSDT",
+                "ANOMALY_MARKET_RISK_OFF_PCT_CHANGE": "-4.0",
+                "ANOMALY_MARKET_RISK_ON_PCT_CHANGE": "4.0",
+            }
+        )
+
+        self.assertFalse(config.market_filter_enabled)
+        self.assertEqual(config.market_reference_symbol, "ETHUSDT")
+        self.assertEqual(config.market_risk_off_pct_change, -4.0)
+        self.assertEqual(config.market_risk_on_pct_change, 4.0)
 
     def test_cooldown_allows_stronger_resignal_inside_window(self):
         with tempfile.TemporaryDirectory() as tmp:

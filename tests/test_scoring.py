@@ -1,7 +1,7 @@
 import unittest
 
-from anomaly_tracker.models import Candle
-from anomaly_tracker.scoring import calibrate_asset, select_signal_candidates
+from anomaly_tracker.models import Candle, MarketContext, SignalCandidate
+from anomaly_tracker.scoring import calibrate_asset, market_filter_decision, select_signal_candidates
 
 
 def candle(i, close, volume=1_000_000, high=None, low=None):
@@ -62,6 +62,56 @@ class ScoringTests(unittest.TestCase):
         scored = calibrate_asset("STALEUSDT", candles, rolling_bars=24)
 
         self.assertEqual(select_signal_candidates([scored], global_limit=5), [])
+
+    def test_market_filter_suppresses_weak_bullish_signal_in_risk_off(self):
+        candidate = SignalCandidate(
+            symbol="ALTUSDT",
+            open_time=1,
+            close=10.0,
+            pct_change=2.1,
+            score=3.5,
+            level="signal",
+            direction="up",
+            global_rank=1,
+            reason="hacimli alim",
+        )
+        context = MarketContext(
+            reference_symbol="BTCUSDT",
+            pct_change=-3.2,
+            direction="down",
+            mode="risk_off",
+            reason="BTCUSDT -3.20%",
+        )
+
+        decision = market_filter_decision(candidate, context)
+
+        self.assertFalse(decision["keep"])
+        self.assertEqual(decision["reason"], "risk_off_weak_bullish")
+
+    def test_market_filter_keeps_critical_bullish_signal_in_risk_off(self):
+        candidate = SignalCandidate(
+            symbol="ALTUSDT",
+            open_time=1,
+            close=10.0,
+            pct_change=8.0,
+            score=7.0,
+            level="critical",
+            direction="up",
+            global_rank=1,
+            reason="hacimli alim",
+        )
+        context = MarketContext(
+            reference_symbol="BTCUSDT",
+            pct_change=-3.2,
+            direction="down",
+            mode="risk_off",
+            reason="BTCUSDT -3.20%",
+        )
+
+        decision = market_filter_decision(candidate, context)
+
+        self.assertTrue(decision["keep"])
+        self.assertEqual(decision["reason"], "critical_override")
 
 
 if __name__ == "__main__":

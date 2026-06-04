@@ -48,6 +48,15 @@ class AssetCalibration:
 
 
 @dataclass(frozen=True)
+class MarketContext:
+    reference_symbol: str
+    pct_change: float
+    direction: str
+    mode: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class SignalCandidate:
     symbol: str
     open_time: int
