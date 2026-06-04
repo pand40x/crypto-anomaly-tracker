@@ -11,6 +11,8 @@ from urllib.parse import parse_qs, urlparse
 
 from anomaly_tracker.runner import run_scan
 from anomaly_tracker.runtime import AppConfig
+from anomaly_tracker.telegram import get_updates, send_message
+from anomaly_tracker.telegram_commands import command_response
 
 
 def _iso_utc(timestamp: float | None) -> str | None:
@@ -47,6 +49,9 @@ def health_payload(config: AppConfig, state: "ScanState | None" = None) -> dict:
         "market_filter_enabled": config.market_filter_enabled,
         "market_reference_symbol": config.market_reference_symbol,
         "telegram_configured": bool(config.telegram_bot_token and config.telegram_chat_id),
+        "telegram_commands_enabled": bool(
+            config.telegram_commands_enabled and config.telegram_bot_token and config.telegram_chat_id
+        ),
     }
     if state is not None:
         payload.update(state.snapshot())
@@ -223,7 +228,7 @@ def dashboard_html(health: dict, signals: dict) -> str:
             )
         )
     if not cards:
-        cards.append("<article class=\"card\"><h2>Sinyal yok</h2><p>Son taramada aday uretilmedi.</p></article>")
+        cards.append("<article class=\"card\"><h2>Sinyal yok</h2><p>Son taramada aday üretilmedi.</p></article>")
     market = signals.get("market_context") or {}
     return f"""<!doctype html>
 <html lang=\"tr\">
@@ -244,7 +249,7 @@ def dashboard_html(health: dict, signals: dict) -> str:
 <body>
 <main>
   <h1>crypto-anomaly-tracker</h1>
-  <p>Hacimli hareketler, piyasa filtresi ve Telegram gonderim kararlarini izler.</p>
+  <p>Hacimli hareketleri, piyasa filtresini ve Telegram gönderim kararlarını izler.</p>
   <section class=\"grid\">
     <div class=\"stat\"><strong>Service</strong><br>{escape(str(health.get("status", "unknown")))} / running={escape(str(health.get("running", False)))}</div>
     <div class=\"stat\"><strong>Signals</strong><br>{escape(str(signals.get("candidate_count", 0)))} kept, {escape(str(signals.get("filtered_count", 0)))} filtered</div>
@@ -258,6 +263,54 @@ def dashboard_html(health: dict, signals: dict) -> str:
 </main>
 </body>
 </html>"""
+
+
+def handle_telegram_update(
+    config: AppConfig,
+    state: ScanState,
+    update: dict,
+    read_signals,
+    send,
+    start_scan,
+) -> bool:
+    message = update.get("message") or {}
+    chat = message.get("chat") or {}
+    chat_id = str(chat.get("id", ""))
+    if not config.telegram_chat_id or chat_id != str(config.telegram_chat_id):
+        return False
+    text = message.get("text")
+    if not isinstance(text, str):
+        return False
+    with state.lock:
+        health = health_payload(config, state)
+    response, action = command_response(text, health, read_signals(), config.public_base_url)
+    if response is None:
+        return False
+    if action == "scan":
+        start_scan()
+    send(chat_id, response)
+    return True
+
+
+def _telegram_offset_path(config: AppConfig) -> Path:
+    return config.output_dir / "telegram_updates_offset.json"
+
+
+def _read_telegram_offset(config: AppConfig) -> int | None:
+    path = _telegram_offset_path(config)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return int(payload["offset"])
+    except Exception:
+        return None
+
+
+def _write_telegram_offset(config: AppConfig, offset: int) -> None:
+    path = _telegram_offset_path(config)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"offset": offset}, indent=2), encoding="utf-8")
 
 
 def _run_scan_locked(config: AppConfig, state: ScanState, send_telegram: bool) -> dict:
@@ -274,6 +327,49 @@ def _run_scan_locked(config: AppConfig, state: ScanState, send_telegram: bool) -
         with state.lock:
             state.record_error(exc)
         raise
+
+
+def _start_scan_thread(config: AppConfig, state: ScanState, send_telegram: bool) -> None:
+    thread = threading.Thread(
+        target=lambda: _run_scan_locked(config, state, send_telegram=send_telegram),
+        daemon=True,
+    )
+    thread.start()
+
+
+def start_telegram_command_polling(config: AppConfig, state: ScanState) -> threading.Thread | None:
+    if not (config.telegram_commands_enabled and config.telegram_bot_token and config.telegram_chat_id):
+        return None
+
+    def loop() -> None:
+        offset = _read_telegram_offset(config)
+        while True:
+            try:
+                updates = get_updates(
+                    config.telegram_bot_token or "",
+                    offset=offset,
+                    timeout_seconds=config.telegram_poll_timeout_seconds,
+                )
+                for update in updates:
+                    update_id = int(update.get("update_id", 0))
+                    offset = update_id + 1
+                    _write_telegram_offset(config, offset)
+                    handle_telegram_update(
+                        config,
+                        state,
+                        update,
+                        read_signals=lambda: _read_latest_signals(config.output_dir),
+                        send=lambda chat_id, text: send_message(config.telegram_bot_token or "", chat_id, text),
+                        start_scan=lambda: _start_scan_thread(config, state, send_telegram=True),
+                    )
+            except Exception as exc:
+                with state.lock:
+                    state.last_error = f"telegram command polling failed: {exc}"
+                time.sleep(5)
+
+    thread = threading.Thread(target=loop, daemon=True)
+    thread.start()
+    return thread
 
 
 def make_handler(config: AppConfig, state: ScanState):
@@ -346,5 +442,6 @@ def serve(config: AppConfig | None = None) -> None:
     active_config.output_dir.mkdir(parents=True, exist_ok=True)
     state = ScanState()
     start_scheduler(active_config, state)
+    start_telegram_command_polling(active_config, state)
     server = ThreadingHTTPServer(("0.0.0.0", active_config.port), make_handler(active_config, state))
     server.serve_forever()

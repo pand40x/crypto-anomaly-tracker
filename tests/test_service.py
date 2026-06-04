@@ -1,7 +1,7 @@
 import unittest
 
 from anomaly_tracker.runtime import AppConfig
-from anomaly_tracker.service import ScanState, dashboard_html, health_payload, summary_payload
+from anomaly_tracker.service import ScanState, dashboard_html, handle_telegram_update, health_payload, summary_payload
 
 
 class ServiceTests(unittest.TestCase):
@@ -105,6 +105,51 @@ class ServiceTests(unittest.TestCase):
         self.assertIn("risk_off", html)
         self.assertIn("first_signal", html)
         self.assertIn("Hacimli", html)
+
+    def test_handle_telegram_update_replies_to_allowed_chat_and_starts_scan(self):
+        config = AppConfig.from_env(
+            {
+                "TELEGRAM_BOT_TOKEN": "token",
+                "TELEGRAM_USER_ID": "42",
+                "ANOMALY_PUBLIC_BASE_URL": "https://radar.example",
+            }
+        )
+        state = ScanState()
+        sent = []
+        scans = []
+        update = {"message": {"chat": {"id": 42}, "text": "/scan"}}
+
+        handled = handle_telegram_update(
+            config,
+            state,
+            update,
+            read_signals=lambda: {"candidate_count": 0, "candidates": []},
+            send=lambda chat_id, text: sent.append((chat_id, text)),
+            start_scan=lambda: scans.append(True),
+        )
+
+        self.assertTrue(handled)
+        self.assertEqual(scans, [True])
+        self.assertEqual(sent[0][0], "42")
+        self.assertIn("başlatıyorum", sent[0][1])
+
+    def test_handle_telegram_update_ignores_other_chats(self):
+        config = AppConfig.from_env({"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_USER_ID": "42"})
+        state = ScanState()
+        sent = []
+        update = {"message": {"chat": {"id": 99}, "text": "/status"}}
+
+        handled = handle_telegram_update(
+            config,
+            state,
+            update,
+            read_signals=lambda: {"candidate_count": 0, "candidates": []},
+            send=lambda chat_id, text: sent.append((chat_id, text)),
+            start_scan=lambda: None,
+        )
+
+        self.assertFalse(handled)
+        self.assertEqual(sent, [])
 
 if __name__ == "__main__":
     unittest.main()

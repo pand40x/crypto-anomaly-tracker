@@ -39,29 +39,51 @@ def display_symbol(symbol: str) -> str:
 
 def _level_text(level: str) -> str:
     return {
-        "critical": "kritik",
-        "signal": "sinyal",
-        "watch": "izleme",
+        "critical": "Kritik",
+        "signal": "Sinyal",
+        "watch": "İzleme",
     }.get(level, level)
 
 
 def _direction_text(direction: str) -> str:
     return {
-        "up": "alim",
-        "down": "satis",
+        "up": "Alım",
+        "down": "Satış",
     }.get(direction, direction)
+
+
+def _reason_text(reason: str) -> str:
+    replacements = {
+        "alim": "alım",
+        "satis": "satış",
+        "genis": "geniş",
+        "band kirilimi": "bant kırılımı",
+        "normal disi": "normal dışı",
+    }
+    result = reason
+    for source, target in replacements.items():
+        result = result.replace(source, target)
+    return result
+
+
+def _headline(candidate: SignalCandidate) -> str:
+    if candidate.lane == "fast":
+        return f"⚡ HIZLI SİNYAL | {display_symbol(candidate.symbol)}"
+    if candidate.level == "critical":
+        return f"🚨 KRİTİK SİNYAL | {display_symbol(candidate.symbol)}"
+    return f"📈 SİNYAL | {display_symbol(candidate.symbol)}"
 
 
 def candidate_to_message(candidate: SignalCandidate) -> str:
     interval_text = {"1h": "1s", "4h": "4s", "1d": "1g"}.get(candidate.source_interval, candidate.source_interval)
-    lane_text = " | FAST" if candidate.lane == "fast" else ""
     lines = [
-        f"{display_symbol(candidate.symbol)} | {format_price(candidate.close)} | {interval_text} {candidate.pct_change:+.2f}%{lane_text}",
+        _headline(candidate),
+        f"Fiyat: {format_price(candidate.close)} | {interval_text}: {candidate.pct_change:+.2f}%",
         (
-            f"Onem: {_level_text(candidate.level)} | Yon: {_direction_text(candidate.direction)} | "
-            f"Sira: #{candidate.global_rank} | Skor: {candidate.score:.2f}"
+            f"Yön: {_direction_text(candidate.direction)} | Sıra: #{candidate.global_rank} | "
+            f"Skor: {candidate.score:.2f}"
         ),
-        f"Sebep: {candidate.reason}",
+        f"Neden: {_reason_text(candidate.reason)}",
     ]
     if candidate.quote_volume > 0:
         lines.append(f"Hacim: {format_compact_usd(candidate.quote_volume)}")

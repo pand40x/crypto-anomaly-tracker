@@ -32,8 +32,18 @@ Routes:
 
 - `GET /health`
 - `GET /signals`
+- `GET /summary`
+- `GET /dashboard`
 - `POST /scan`
 - `POST /scan?send=1`
+
+Telegram commands are enabled when `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`/`TELEGRAM_USER_ID` are set:
+
+- `/status` or `/durum`
+- `/signals` or `/sinyaller`
+- `/scan` or `/tara`
+- `/dashboard` or `/panel`
+- `/help`
 
 ## Algorithm
 

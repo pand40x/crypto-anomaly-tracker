@@ -56,6 +56,9 @@ class AppConfig:
     market_reference_symbol: str
     market_risk_off_pct_change: float
     market_risk_on_pct_change: float
+    telegram_commands_enabled: bool
+    telegram_poll_timeout_seconds: int
+    public_base_url: str | None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "AppConfig":
@@ -91,4 +94,7 @@ class AppConfig:
             market_reference_symbol=source.get("ANOMALY_MARKET_REFERENCE_SYMBOL", "BTCUSDT"),
             market_risk_off_pct_change=_float_env(source, "ANOMALY_MARKET_RISK_OFF_PCT_CHANGE", -2.5),
             market_risk_on_pct_change=_float_env(source, "ANOMALY_MARKET_RISK_ON_PCT_CHANGE", 2.5),
+            telegram_commands_enabled=_bool_env(source, "TELEGRAM_COMMANDS_ENABLED", True),
+            telegram_poll_timeout_seconds=_int_env(source, "TELEGRAM_POLL_TIMEOUT_SECONDS", 25),
+            public_base_url=source.get("ANOMALY_PUBLIC_BASE_URL") or None,
         )

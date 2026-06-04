@@ -57,6 +57,8 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(config.market_reference_symbol, "BTCUSDT")
         self.assertEqual(config.market_risk_off_pct_change, -2.5)
         self.assertEqual(config.market_risk_on_pct_change, 2.5)
+        self.assertTrue(config.telegram_commands_enabled)
+        self.assertEqual(config.telegram_poll_timeout_seconds, 25)
 
     def test_config_reads_market_filter_overrides(self):
         config = AppConfig.from_env(
@@ -65,6 +67,9 @@ class RuntimeTests(unittest.TestCase):
                 "ANOMALY_MARKET_REFERENCE_SYMBOL": "ETHUSDT",
                 "ANOMALY_MARKET_RISK_OFF_PCT_CHANGE": "-4.0",
                 "ANOMALY_MARKET_RISK_ON_PCT_CHANGE": "4.0",
+                "TELEGRAM_COMMANDS_ENABLED": "false",
+                "TELEGRAM_POLL_TIMEOUT_SECONDS": "10",
+                "ANOMALY_PUBLIC_BASE_URL": "https://radar.example",
             }
         )
 
@@ -72,6 +77,9 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(config.market_reference_symbol, "ETHUSDT")
         self.assertEqual(config.market_risk_off_pct_change, -4.0)
         self.assertEqual(config.market_risk_on_pct_change, 4.0)
+        self.assertFalse(config.telegram_commands_enabled)
+        self.assertEqual(config.telegram_poll_timeout_seconds, 10)
+        self.assertEqual(config.public_base_url, "https://radar.example")
 
     def test_cooldown_allows_stronger_resignal_inside_window(self):
         with tempfile.TemporaryDirectory() as tmp:

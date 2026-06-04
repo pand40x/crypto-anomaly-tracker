@@ -32,7 +32,7 @@ class ScoringTests(unittest.TestCase):
         self.assertGreater(result.thresholds.critical, result.thresholds.signal)
         self.assertEqual(result.rows[-1].level, "critical")
         self.assertGreater(result.rows[-1].score, result.thresholds.critical)
-        self.assertIn("hacimli alim", result.rows[-1].reason.lower())
+        self.assertIn("hacimli alım", result.rows[-1].reason.lower())
         self.assertGreater(result.rows[-1].quote_volume, 0)
 
     def test_global_candidates_require_asset_signal_and_rank_limit(self):

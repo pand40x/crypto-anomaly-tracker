@@ -26,16 +26,18 @@ class OutputTests(unittest.TestCase):
             message,
             "\n".join(
                 [
-                    "HOME | $0.0506 | 4s +36.89%",
-                    "Onem: kritik | Yon: alim | Sira: #1 | Skor: 6.20",
-                    "Sebep: hacimli alim, genis mum",
+                    "🚨 KRİTİK SİNYAL | HOME",
+                    "Fiyat: $0.0506 | 4s: +36.89%",
+                    "Yön: Alım | Sıra: #1 | Skor: 6.20",
+                    "Neden: hacimli alım, geniş mum",
                     "Hacim: $13.8M",
                 ]
             ),
         )
         self.assertIn("$0.0506", message)
-        self.assertNotIn("x canlandi", message)
-        self.assertNotIn("haber iddiasi", message)
+        self.assertNotIn("Onem", message)
+        self.assertNotIn("Yon", message)
+        self.assertNotIn("genis", message)
 
     def test_candidate_to_message_marks_fast_lane_on_first_line(self):
         candidate = SignalCandidate(
@@ -55,8 +57,8 @@ class OutputTests(unittest.TestCase):
 
         message = candidate_to_message(candidate)
 
-        self.assertEqual(message.splitlines()[0], "BTC | $109,250 | 1s +2.40% | FAST")
-        self.assertIn("Onem: sinyal", message)
+        self.assertEqual(message.splitlines()[0], "⚡ HIZLI SİNYAL | BTC")
+        self.assertIn("Yön: Alım", message)
         self.assertIn("Hacim: $12.4M", message)
 
     def test_candidates_to_jsonable_preserves_rank_and_reason(self):
