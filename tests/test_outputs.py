@@ -30,7 +30,6 @@ class OutputTests(unittest.TestCase):
                     "Kritik alım sinyali",
                     "Fiyat: $0.0506 · Hacim: $13.8M",
                     "Neden: Hacimli alım, geniş mum",
-                    "Öncelik: #1 · Skor: 6.20",
                 ]
             ),
         )
@@ -40,6 +39,8 @@ class OutputTests(unittest.TestCase):
         self.assertNotIn("genis", message)
         self.assertNotIn("Yön:", message)
         self.assertNotIn("Sıra:", message)
+        self.assertNotIn("Öncelik:", message)
+        self.assertNotIn("Skor:", message)
 
     def test_candidate_to_message_marks_fast_lane_on_first_line(self):
         candidate = SignalCandidate(

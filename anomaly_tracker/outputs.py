@@ -107,7 +107,6 @@ def candidate_to_message(candidate: SignalCandidate) -> str:
         _signal_label(candidate),
         price_line,
         f"Neden: {_sentence_text(_reason_text(candidate.reason))}",
-        f"Öncelik: #{candidate.global_rank} · Skor: {candidate.score:.2f}",
     ]
     return "\n".join(lines)
 
