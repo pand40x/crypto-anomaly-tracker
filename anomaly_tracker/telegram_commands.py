@@ -96,8 +96,16 @@ def _candidate_line(candidate: dict) -> str:
     decision = (candidate.get("send_decision") or {}).get("reason", "unknown")
     message = str(candidate.get("message", "")).splitlines()
     headline = message[0] if message else symbol
-    move = message[1] if len(message) > 1 else ""
-    return f"• {headline}\n  {move}\n  Karar: {decision}"
+    signal = message[1] if len(message) > 1 else ""
+    price = message[2] if len(message) > 2 else ""
+    decision_text = {
+        "first_signal": "yeni sinyal",
+        "stronger_signal": "güçlenen sinyal",
+        "cooldown": "beklemede",
+        "not_sendable": "izleme",
+    }.get(str(decision), str(decision).replace("_", " "))
+    details = [line for line in (signal, price) if line]
+    return f"• {headline}\n  {' · '.join(details)}\n  Gönderim: {decision_text}"
 
 
 def build_signals_message(signals: dict, limit: int = 5) -> str:

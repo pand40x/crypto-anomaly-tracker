@@ -50,7 +50,7 @@ class TelegramCommandTests(unittest.TestCase):
                 "candidates": [
                     {
                         "symbol": "ZROUSDT",
-                        "message": "🚨 KRİTİK SİNYAL | ZRO\nFiyat: $1.067 | 1s: -5.83%",
+                        "message": "🚨 ZRO -5.83% (1s)\nKritik satış sinyali\nFiyat: $1.067 · Hacim: $2.1M",
                         "send_decision": {"send": True, "reason": "first_signal"},
                     }
                 ],
@@ -60,7 +60,8 @@ class TelegramCommandTests(unittest.TestCase):
         self.assertIn("Son Sinyaller", text)
         self.assertIn("BTCUSDT: neutral (-0.42%)", text)
         self.assertIn("ZRO", text)
-        self.assertIn("first_signal", text)
+        self.assertIn("Gönderim: yeni sinyal", text)
+        self.assertNotIn("first_signal", text)
 
     def test_command_response_routes_scan_status_signals_and_dashboard(self):
         health = {"running": False, "last_error": None, "last_result_summary": {"candidate_count": 0}}

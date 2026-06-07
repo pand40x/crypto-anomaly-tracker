@@ -52,6 +52,10 @@ def _direction_text(direction: str) -> str:
     }.get(direction, direction)
 
 
+def _direction_label(direction: str) -> str:
+    return _direction_text(direction).lower()
+
+
 def _reason_text(reason: str) -> str:
     replacements = {
         "alim": "alım",
@@ -66,27 +70,45 @@ def _reason_text(reason: str) -> str:
     return result
 
 
-def _headline(candidate: SignalCandidate) -> str:
+def _sentence_text(text: str) -> str:
+    text = text.strip()
+    return text[:1].upper() + text[1:] if text else text
+
+
+def _signal_emoji(candidate: SignalCandidate) -> str:
     if candidate.lane == "fast":
-        return f"⚡ HIZLI SİNYAL | {display_symbol(candidate.symbol)}"
+        return "⚡"
     if candidate.level == "critical":
-        return f"🚨 KRİTİK SİNYAL | {display_symbol(candidate.symbol)}"
-    return f"📈 SİNYAL | {display_symbol(candidate.symbol)}"
+        return "🚨"
+    return "📈"
+
+
+def _signal_label(candidate: SignalCandidate) -> str:
+    if candidate.lane == "fast":
+        prefix = "Hızlı"
+    elif candidate.level == "critical":
+        prefix = "Kritik"
+    else:
+        prefix = "Aktif"
+    return f"{prefix} {_direction_label(candidate.direction)} sinyali"
+
+
+def _headline(candidate: SignalCandidate, interval_text: str) -> str:
+    return f"{_signal_emoji(candidate)} {display_symbol(candidate.symbol)} {candidate.pct_change:+.2f}% ({interval_text})"
 
 
 def candidate_to_message(candidate: SignalCandidate) -> str:
     interval_text = {"1h": "1s", "4h": "4s", "1d": "1g"}.get(candidate.source_interval, candidate.source_interval)
-    lines = [
-        _headline(candidate),
-        f"Fiyat: {format_price(candidate.close)} | {interval_text}: {candidate.pct_change:+.2f}%",
-        (
-            f"Yön: {_direction_text(candidate.direction)} | Sıra: #{candidate.global_rank} | "
-            f"Skor: {candidate.score:.2f}"
-        ),
-        f"Neden: {_reason_text(candidate.reason)}",
-    ]
+    price_line = f"Fiyat: {format_price(candidate.close)}"
     if candidate.quote_volume > 0:
-        lines.append(f"Hacim: {format_compact_usd(candidate.quote_volume)}")
+        price_line = f"{price_line} · Hacim: {format_compact_usd(candidate.quote_volume)}"
+    lines = [
+        _headline(candidate, interval_text),
+        _signal_label(candidate),
+        price_line,
+        f"Neden: {_sentence_text(_reason_text(candidate.reason))}",
+        f"Öncelik: #{candidate.global_rank} · Skor: {candidate.score:.2f}",
+    ]
     return "\n".join(lines)
 
 
